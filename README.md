@@ -36,5 +36,5 @@ Pascal). Также вы можете реализовать задания дл
 
 ## Helpful links
 
-[precedence](https://rosettacode.org/wiki/Operator_precedence#Haskell)
+[precedence](https://rosettacode.org/wiki/Operator_precedence#Haskell) \
 [final tagless](https://slides.com/fp-ctd/lecture-11#/18/0/2)
