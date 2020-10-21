@@ -19,6 +19,8 @@ tokens :-
     and                                         { \_ -> TAnd }
     or                                          { \_ -> TOr }
     not                                         { \_ -> TNot }
+    if                                          { \_ -> TIf }
+    else                                        { \_ -> TElse }
 
     \:                                          { \_ -> TColon }
     \;                                          { \_ -> TSemi }
