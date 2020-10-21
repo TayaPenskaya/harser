@@ -56,7 +56,7 @@ tokens :-
     \'[^\']*\'                                  { \s -> TString s }
 
 {
-data Token = TWhile | TReturn | TTrue | TFalse | TDef | TAnd | TOr | TNot
+data Token = TWhile | TReturn | TTrue | TFalse | TDef | TAnd | TOr | TNot | TIf | TElse
     | TColon | TSemi | TComma 
     | TPlus | TMinus | TMul | TDiv 
     | TEq | TNEq | TGE | TLE | TG | TL 
