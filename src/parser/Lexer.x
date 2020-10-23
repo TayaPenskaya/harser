@@ -1,5 +1,8 @@
 {
-    module Lexer where
+module Lexer 
+( Token(..)
+, alexScanTokens
+) where
 }
 
 %wrapper "basic"
@@ -9,18 +12,26 @@ $alpha = [a-zA-Z]
 
 tokens :-
 
-    $white+                                     ;
+    $white+                                      ;
 
     while                                       { \_ -> TWhile }
-    return                                      { \_ -> TReturn }
-    True                                        { \_ -> TTrue }
-    False                                       { \_ -> TFalse }
-    def                                         { \_ -> TDef }
-    and                                         { \_ -> TAnd }
-    or                                          { \_ -> TOr }
-    not                                         { \_ -> TNot }
     if                                          { \_ -> TIf }
     else                                        { \_ -> TElse }
+    return                                      { \_ -> TReturn }
+
+    cin                                         { \_ -> TCin }
+    cout                                        { \_ -> TCout }
+    \>\>                                        { \_ -> TRShift }
+    \<\<                                        { \_ -> TLShift }
+
+    int                                         { \_ -> TIntType }
+    double                                      { \_ -> TDoubleType }
+    bool                                        { \_ -> TBoolType }
+    string                                      { \_ -> TStringType }
+    void                                        { \_ -> TVoidType }
+    
+    True                                        { \_ -> TTrue }
+    False                                       { \_ -> TFalse }
 
     \:                                          { \_ -> TColon }
     \;                                          { \_ -> TSemi }
@@ -38,6 +49,10 @@ tokens :-
     \>                                          { \_ -> TG }
     \<                                          { \_ -> TL }
 
+    and                                         { \_ -> TAnd }
+    or                                          { \_ -> TOr }
+    not                                         { \_ -> TNot }
+
     \&\&                                        { \_ -> TAnd }
     \|\|                                        { \_ -> TOr }
     \!                                          { \_ -> TNot }
@@ -46,22 +61,30 @@ tokens :-
     \)                                          { \_ -> TRPar }
 
     \{                                          { \_ -> TLBr }
-    \}                                          { \_ -> TRbr }
+    \}                                          { \_ -> TRBr }
 
     \=                                          { \_ -> TAssign }
 
+    \\n                                          { \_ -> TNewline }
+
     $digit+                                     { \s -> TInt (read s) }
     $digit+ \. $digit+                          { \s -> TDouble (read s) }
+    \"[^\"]*\"                                  { \s -> TString s }
     $alpha ([a-za-z0-9_])*                      { \s -> TName s }
-    \'[^\']*\'                                  { \s -> TString s }
 
 {
-data Token = TWhile | TReturn | TTrue | TFalse | TDef | TAnd | TOr | TNot | TIf | TElse
+data Token = TFun | TWhile | TIf | TElse | TReturn 
+    | TCin | TCout | TRShift | TLShift
+    | TIntType | TDoubleType | TBoolType | TStringType | TVoidType
+    | TTrue | TFalse 
     | TColon | TSemi | TComma 
     | TPlus | TMinus | TMul | TDiv 
     | TEq | TNEq | TGE | TLE | TG | TL 
     | TAnd | TOr | TNot 
-    | TLPar | TRPar | TLBr | TRbr | TAssign
-    | TInt Int | TDouble Double | TName String | TString String
+    | TLPar | TRPar 
+    | TLBr | TRBr 
+    | TAssign
+    | TNewline
+    | TInt Int | TDouble Double | TString String | TName String 
     deriving (Eq, Show)
 }
