@@ -4,6 +4,7 @@ module Grammar
   ( Value(..)
   , ValType(..)
   , FunType(..)
+  , Name
   , Expr(..)
   , Stmt(..)
   , Fun(..)
@@ -29,6 +30,8 @@ data FunType
   | VoidType
   deriving (Eq, Show)
 
+type Name = (String, String)
+
 data Expr
   = ExprPlus Expr Expr
   | ExprMinus Expr Expr
@@ -46,18 +49,18 @@ data Expr
   | ExprNot Expr
   | ExprBracketed Expr
   | ExprVar String
-  | ExprFun0 String
-  | ExprFun1 String Expr
-  | ExprFun2 String Expr Expr
+  | ExprFun0 Name
+  | ExprFun1 Name Expr
+  | ExprFun2 Name Expr Expr
   | ExprVal Value
   deriving (Eq, Show)
 
 data Stmt 
   = AssignStmt ValType String Expr
   | ReturnStmt Expr
-  | Fun0Stmt String 
-  | Fun1Stmt String Expr
-  | Fun2Stmt String Expr Expr
+  | Fun0Stmt Name 
+  | Fun1Stmt Name Expr
+  | Fun2Stmt Name Expr Expr
   | ReadStmt Expr
   | WriteStmt Expr
   | WhileStmt Expr [Stmt]
