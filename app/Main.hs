@@ -3,10 +3,15 @@ module Main where
 import Lexer(Token(..), alexScanTokens)
 import Parser(parseCPP)
 import Grammar(Program(..))
-import CDSL(Interpret(..), test)
+import CDSL(test2, test)
 
 main :: IO()
 -- main = do
 --   s <-  getLine
 --   print (parseCPP . alexScanTokens $ s) 
-main = print (interpret test)
+main = do
+  res <- test
+  res2 <- test2
+  print(res)
+  print(res2)
+  pure ()
