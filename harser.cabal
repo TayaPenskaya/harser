@@ -30,6 +30,7 @@ library
       Lexer
     , Parser
     , Grammar
+    , CDSL
   other-modules:
       Paths_harser
   hs-source-dirs:
@@ -57,7 +58,7 @@ test-suite harser-test
   other-modules:
       Paths_harser
     , TestUtil
-    , ParserTest
+    , ParserTestSpec
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
@@ -65,4 +66,6 @@ test-suite harser-test
       base >=4.7 && <5
     , harser
     , hspec
+    , hspec-leancheck
+    , hspec-discover
   default-language: Haskell2010
