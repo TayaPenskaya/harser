@@ -31,6 +31,7 @@ import Lexer
     TRUE                { TTrue }
     FALSE               { TFalse }
 
+    '::'                { TDColon }
     ';'                 { TSemi }
     ','                 { TComma }
 
@@ -58,8 +59,6 @@ import Lexer
 
     '='                 { TAssign }
 
-    NEWLINE             { TNewline }
-
     NAME                { TName $$ }
     INT_VAL             { TInt $$ }
     DOUBLE_VAL          { TDouble $$ }
@@ -70,7 +69,7 @@ import Lexer
 %left '!' 
 %nonassoc '==' '!=' '<' '<=' '>' '>='
 %left '+' '-'
-%left '*' '/' '%'
+%left '*' '/' 
 %left '-'
 
 %%
@@ -101,11 +100,13 @@ statement
 simple_statement
     : vtype NAME '=' expr           { AssignStmt $1 $2 $4 }
 	| RETURN expr                   { ReturnStmt $2 }
-    | NAME '('')'                   { Fun0Stmt $1 }
-    | NAME '(' expr ')'             { Fun1Stmt $1 $3 }
-    | NAME '(' expr ',' expr ')'    { Fun2Stmt $1 $3 $5 }
-    | CIN '>>' expr                 { ReadStmt $3 }
-    | COUT '<<' expr                { WriteStmt $3 }
+    | fname '('')'                   { Fun0Stmt $1 }
+    | fname '(' expr ')'             { Fun1Stmt $1 $3 }
+    | fname '(' expr ',' expr ')'    { Fun2Stmt $1 $3 $5 }
+    | NAME '::' CIN '>>' expr        { ReadStmt $5 }
+    | NAME '::' COUT '<<' expr       { WriteStmt $5 }
+
+
 
 compound_statement
     : WHILE '(' expr ')' body                { WhileStmt $3 $5 }                 
@@ -129,10 +130,14 @@ expr
     | '!'  expr                     { ExprNot $2 }
     | '(' expr ')'       		    { ExprBracketed $2 }
     | NAME				            { ExprVar $1 }
-    | NAME '(' ')'                  { ExprFun0 $1 }
-    | NAME '(' expr ')'             { ExprFun1 $1 $3 }
-    | NAME '(' expr ',' expr ')'    { ExprFun2 $1 $3 $5 }
+    | fname '(' ')'                 { ExprFun0 $1 }
+    | fname '(' expr ')'            { ExprFun1 $1 $3 }
+    | fname '(' expr ',' expr ')'   { ExprFun2 $1 $3 $5 }
     | value                         { ExprVal $1 }
+
+fname
+    : NAME                          { ("", $1) }
+    | NAME '::' NAME                { ($1, $3) }
 
 
 value 

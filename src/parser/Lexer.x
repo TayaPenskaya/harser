@@ -12,7 +12,8 @@ $alpha = [a-zA-Z]
 
 tokens :-
 
-    $white+                                      ;
+    $white+                                     ;
+    \\n                                         ;
 
     while                                       { \_ -> TWhile }
     if                                          { \_ -> TIf }
@@ -30,10 +31,10 @@ tokens :-
     string                                      { \_ -> TStringType }
     void                                        { \_ -> TVoidType }
     
-    True                                        { \_ -> TTrue }
-    False                                       { \_ -> TFalse }
+    true                                        { \_ -> TTrue }
+    false                                       { \_ -> TFalse }
 
-    \:                                          { \_ -> TColon }
+    \:\:                                        { \_ -> TDColon }
     \;                                          { \_ -> TSemi }
     \,                                          { \_ -> TComma }
 
@@ -65,8 +66,6 @@ tokens :-
 
     \=                                          { \_ -> TAssign }
 
-    \\n                                          { \_ -> TNewline }
-
     $digit+                                     { \s -> TInt (read s) }
     $digit+ \. $digit+                          { \s -> TDouble (read s) }
     \"[^\"]*\"                                  { \s -> TString s }
@@ -77,14 +76,13 @@ data Token = TFun | TWhile | TIf | TElse | TReturn
     | TCin | TCout | TRShift | TLShift
     | TIntType | TDoubleType | TBoolType | TStringType | TVoidType
     | TTrue | TFalse 
-    | TColon | TSemi | TComma 
+    | TDColon | TSemi | TComma 
     | TPlus | TMinus | TMul | TDiv 
     | TEq | TNEq | TGE | TLE | TG | TL 
     | TAnd | TOr | TNot 
     | TLPar | TRPar 
     | TLBr | TRBr 
     | TAssign
-    | TNewline
     | TInt Int | TDouble Double | TString String | TName String 
     deriving (Eq, Show)
 }
