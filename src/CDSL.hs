@@ -38,6 +38,7 @@ instance Num (CVar a) where
     (+) (CDouble x) (CInt    y) = CDouble $ x + fromIntegral y
     (+) (CDouble x) (CDouble y) = CDouble $ x + y
     (+) (CString x) (CString y) = CString $ x ++ y
+    (+) (CBool x) (CBool y) = CBool $ x || y
 
     (*) (CInt    x) (CInt    y) = CInt $ x * y
     (*) (CInt    x) (CDouble y) = CDouble $ fromIntegral x * y
@@ -53,6 +54,15 @@ instance Num (CVar a) where
 
     abs = undefined
     signum = undefined
+
+instance Fractional (CVar a) where
+  fromRational a = CDouble $ fromRational a
+
+  (/) (CInt    x) (CInt    y) = CInt $ x `div` y
+  (/) (CInt    x) (CDouble y) = CDouble $ fromIntegral x / y
+  (/) (CDouble x) (CDouble y) = CDouble $ x / y
+  (/) (CDouble x) (CInt    y) = CDouble $ x / fromIntegral y
+
 
 {- 
 * Конструкции для работы с переменными (присваивание, чтение
@@ -95,8 +105,8 @@ class CExpr expr where
     -- infixl 7 @*
     -- (@*) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
 
-    -- infixl 7 @/
-    -- (@/) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
+    infixl 7 @/
+    (@/) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
 
     -- infixr 3 @&&
     -- (@&&) :: expr Bool -> expr Bool -> expr Bool
@@ -114,14 +124,16 @@ class CExpr expr where
 
     -- cWrite :: CVar a => expr a -> expr ()
 
-    cFun0 :: Type -> Name -> (expr (VarWrap expr) -> expr ()) -> expr (CVar a)
+    cWithVar :: Type -> Name -> expr (CVar a) -> (expr (VarWrap expr (CVar a)) -> expr ()) -> expr ()
 
-    -- cFun1 :: (CVar a, CVar b) => expr a -> expr b
+    cFun0 :: Type -> Name -> (expr (VarWrap expr (CVar a)) -> expr ()) -> expr (CVar a)
 
-    -- cFun2 :: (CVar a, CVar b, CVar c) => expr a -> expr b -> expr c 
+    -- cFun1 :: Type -> Name -> (expr (VarWrap expr (CVar a)) -> expr (VarWrap expr (CVar a)) -> expr ()) -> expr (CVar a) -> expr (CVar a)
+
+    -- cFun2 :: Type -> Name -> (expr (VarWrap expr (CVar a)) -> expr (VarWrap expr (CVar a)) -> expr (VarWrap expr (CVar a)) -> expr ()) -> expr (CVar a) -> expr (CVar a) -> expr (CVar a)
 
 test :: CExpr expr => expr (CVar Int)
-test = cVarWrap (CInt 5) @+ cVarWrap (CInt 7)
+test = cVarWrap (CDouble 8.8) @/ cVarWrap (CDouble 2)
 
 newtype Interpret a =
     Interpret { interpret :: a }
@@ -132,3 +144,5 @@ instance CExpr Interpret where
         interpret a + interpret b
     (@>) a b = Interpret $
         interpret a > interpret b
+    (@/) a b = Interpret $
+        interpret a / interpret b
