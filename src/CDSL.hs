@@ -4,9 +4,14 @@
 module CDSL 
 ( CVar(..)
 , CExpr(..)
-, Interpret (..)
 , test
+, test2
 ) where
+
+
+import  Control.Applicative (liftA2)
+import  Control.Monad.ST.Strict (ST, runST)
+import  Data.IORef (IORef, newIORef, readIORef, writeIORef)
 
 type Type = String
 type Name = String
@@ -78,45 +83,45 @@ class CExpr expr where
 
     cVarWrap :: CVar a -> expr (CVar a)
 
-    -- infix 4 @=
-    -- (@=) :: CVar a => (VarWrap expr) a -> a -> expr ()  -- a = b (a - (VarWrap expr) a, b - a, return - expr ())
+    infix 4 @=
+    (@=) :: expr (VarWrap expr (CVar a)) -> expr (CVar a) -> expr ()  
 
     infix 4 @>
     (@>) :: expr (CVar a) -> expr (CVar a) -> expr Bool
 
-    -- infix 4 @>=
-    -- (@>=) :: expr (CVar a) -> expr (CVar a) -> expr Bool
+    infix 4 @>=
+    (@>=) :: expr (CVar a) -> expr (CVar a) -> expr Bool
 
-    -- infix 4 @<
-    -- (@<) :: expr (CVar a) -> expr (CVar a) -> expr Bool
+    infix 4 @<
+    (@<) :: expr (CVar a) -> expr (CVar a) -> expr Bool
 
-    -- infix 4 @<=
-    -- (@<=) :: expr (CVar a) -> expr (CVar a) -> expr Bool
+    infix 4 @<=
+    (@<=) :: expr (CVar a) -> expr (CVar a) -> expr Bool
 
-    -- infix 4 @==
-    -- (@==) :: expr (CVar a) -> expr (CVar a) -> expr Bool
+    infix 4 @==
+    (@==) :: expr (CVar a) -> expr (CVar a) -> expr Bool
 
     infixl 6 @+
     (@+) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
 
-    -- infixl 6 @-
-    -- (@-) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
+    infixl 6 @-
+    (@-) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
 
-    -- infixl 7 @*
-    -- (@*) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
+    infixl 7 @*
+    (@*) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
 
     infixl 7 @/
     (@/) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
 
-    -- infixr 3 @&&
-    -- (@&&) :: expr Bool -> expr Bool -> expr Bool
+    infixr 3 @&&
+    (@&&) :: expr Bool -> expr Bool -> expr Bool
 
-    -- infixr 2 @||
-    -- (@||) :: expr Bool -> expr Bool -> expr Bool
+    infixr 2 @||
+    (@||) :: expr Bool -> expr Bool -> expr Bool
 
-    -- cWhile :: expr Bool -> expr a -> expr ()
+    cWhile :: expr Bool -> expr a -> expr ()
 
-    -- cIf :: expr Bool -> expr a -> expr a 
+    cIf :: expr Bool -> expr a -> expr a 
 
     -- cIfElse :: expr Bool -> expr a -> expr a -> expr a
 
@@ -135,14 +140,36 @@ class CExpr expr where
 test :: CExpr expr => expr (CVar Int)
 test = cVarWrap (CDouble 8.8) @/ cVarWrap (CDouble 2)
 
-newtype Interpret a =
-    Interpret { interpret :: a }
+test2 :: CExpr expr => expr (CVar Int)
+test2 = cFun0 "int" "main" (\r -> r @= cVarWrap (CInt 2))
 
-instance CExpr Interpret where
-    cVarWrap = Interpret
-    (@+) a b = Interpret $
-        interpret a + interpret b
-    (@>) a b = Interpret $
-        interpret a > interpret b
-    (@/) a b = Interpret $
-        interpret a / interpret b
+defaultValue :: Type -> CVar a
+defaultValue "int"    = CInt 0
+defaultValue "double" = CDouble 0
+defaultValue "string" = CString ""
+defaultValue "bool"   = CBool False
+defaultValue _        = undefined
+
+instance CExpr IO where
+    type VarWrap IO = IORef
+    cVarWrap = pure
+    (@>) = liftA2 (>)
+    (@>=) = liftA2 (>=)
+    (@<) = liftA2 (<)
+    (@<=) = liftA2 (<=)
+    (@==) = liftA2 (==)
+    (@+) = liftA2 (+)
+    (@-) = liftA2 (-)
+    (@*) = liftA2 (*)
+    (@/) = liftA2 (/)
+    (@&&) = liftA2 (&&)
+    (@||) = liftA2 (||)
+    ref @= val = do
+        v <- val
+        r <- ref
+        writeIORef r v
+    cFun0 fType name func = do
+        let res = newIORef $ defaultValue fType
+        res' <- res
+        _ <- func (pure res')
+        readIORef res'
