@@ -84,6 +84,9 @@ class CExpr expr where
     infix 4 @=
     (@=) :: expr (VarWrap expr (CVar a)) -> expr (CVar a) -> expr ()  
 
+    infix 4 @/=
+    (@/=) :: expr (VarWrap expr (CVar a)) -> expr (CVar a) -> expr ()  
+
     infix 4 @>
     (@>) :: expr (CVar a) -> expr (CVar a) -> expr Bool
 
