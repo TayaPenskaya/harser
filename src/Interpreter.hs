@@ -82,10 +82,36 @@ interpretFun fun =
 
 
 interpretValType :: ValType -> String
-interpretValType = undefined
+interpretValType IntType = "int"
+interpretValType DoubleType = "double"
+interpretValType BoolType = "bool"
+interpretValType StringType = "string"
       
 interpretFunType :: FunType -> String
-interpretFunType = undefined
+interpretFunType FIntType = "int"
+interpretFunType FDoubleType = "double"
+interpretFunType FBoolType = "bool"
+interpretFunType FStringType = "string"
+interpretFunType VoidType = "void"
+
+interpretValue :: Value -> expr (CVar a)
+interpretValue (IntValue v) = cVarWrap v
+interpretValue (StringValue v) = cVarWrap v
+interpretValue (DoubleValue v) = cVarWrap v
+interpretValue (BoolValue v) = cVarWrap v
+
+interpretExpr :: Expr -> FunState expr (expr (CVar a))
+interpretExpr (ExprPlus expr1 expr2) = pure $ interpretExpr expr1 @+ interpretExpr expr2
+interpretExpr (ExprMinus expr1 expr2) = pure $ interpretExpr expr1 @- interpretExpr expr2
+interpretExpr (ExprMul expr1 expr2) = pure $ interpretExpr expr1 @* interpretExpr expr2
+interpretExpr (ExprDiv expr1 expr2) = pure $ interpretExpr expr1 @/ interpretExpr expr2
+interpretExpr (ExprEq expr1 expr2) = pure $ interpretExpr expr1 @== interpretExpr expr2
+interpretExpr (ExprNeq expr1 expr2) = pure $ interpretExpr expr1 @/= interpretExpr expr2
+interpretExpr (ExprGE expr1 expr2) = pure $ interpretExpr expr1 @>= interpretExpr expr2
+interpretExpr (ExprLE expr1 expr2) = pure $ interpretExpr expr1 @<= interpretExpr expr2
+interpretExpr (ExprGT expr1 expr2) = pure $ interpretExpr expr1 @> interpretExpr expr2
+interpretExpr (ExprLT expr1 expr2) = pure $ interpretExpr expr1 @< interpretExpr expr2
+
 
 interpretStmts :: [Stmt] -> FunState expr (expr (CVar a))
 interpretStmts = undefined 
