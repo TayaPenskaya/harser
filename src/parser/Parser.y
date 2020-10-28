@@ -161,7 +161,10 @@ vstring
     : STRING_VAL                    { StringValue $1 }   
 
 ftype
-    : vtype                         { ValType }
+    : INT                           { FIntType }
+    | DOUBLE                        { FDoubleType }
+    | BOOL                          { FBoolType }
+    | STRING                        { FStringType }
     | VOID                          { VoidType }
 
 vtype 
