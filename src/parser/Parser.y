@@ -98,8 +98,9 @@ statement
     | compound_statement ';'            { $1 }
     
 simple_statement
-    : vtype NAME '=' expr           { AssignStmt $1 $2 $4 }
-	| RETURN expr                   { ReturnStmt $2 }
+    : vtype NAME '=' expr            { AssignStmt $1 $2 $4 }
+    | NAME '=' expr                  { AssignStmtWithoutType $1 $3 }
+	| RETURN expr                    { ReturnStmt $2 }
     | fname '('')'                   { Fun0Stmt $1 }
     | fname '(' expr ')'             { Fun1Stmt $1 $3 }
     | fname '(' expr ',' expr ')'    { Fun2Stmt $1 $3 $5 }

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-binds -fno-warn-missing-signatures #-}
 {-# LANGUAGE CPP,MagicHash #-}
-{-# LINE 1 "Lexer.x" #-}
+{-# LINE 1 "./src/parser/Lexer.x" #-}
 
 module Lexer 
 ( Token(..)
@@ -736,7 +736,7 @@ alex_actions = array (0 :: Int, 89)
   , (0,alex_action_44)
   ]
 
-{-# LINE 74 "Lexer.x" #-}
+{-# LINE 74 "./src/parser/Lexer.x" #-}
 
 data Token = TFun | TWhile | TIf | TElse | TReturn 
     | TCin | TCout | TRShift | TLShift
