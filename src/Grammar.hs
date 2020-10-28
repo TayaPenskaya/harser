@@ -57,6 +57,7 @@ data Expr
 
 data Stmt 
   = AssignStmt ValType String Expr
+  | AssignStmtWithoutType String Expr
   | ReturnStmt Expr
   | Fun0Stmt Name 
   | Fun1Stmt Name Expr
