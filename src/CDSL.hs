@@ -9,8 +9,8 @@ module CDSL
 , CExpr(..)
 , Type
 , Name
+, Ref
 , interpretCDSLWithST
-, CVarW
 ) where
 
 import Control.Applicative (liftA2)
@@ -26,18 +26,15 @@ import Control.Monad.Fail (MonadFail)
 type Type = String
 type Name = String
 
-data CVarW where
-  CVarW :: (Typeable a, Show a) => CVar a -> CVarW
-
 -- Типы данных: числа целые и с плавающей точкой, строки и булы.
-data CVar a
+data CVar
   = CInt Int
   | CDouble Double
   | CString String
   | CBool Bool
   deriving (Eq, Ord, Show)
 
-instance Num (CVar a) where
+instance Num CVar where
   (+) (CInt    x) (CInt    y) = CInt $ x + y
   (+) (CInt    x) (CDouble y) = CDouble $ fromIntegral x + y
   (+) (CDouble x) (CInt    y) = CDouble $ x + fromIntegral y
@@ -60,7 +57,7 @@ instance Num (CVar a) where
   abs = undefined
   signum = undefined
 
-instance Fractional (CVar a) where
+instance Fractional CVar where
   fromRational a = CDouble $ fromRational a
 
   (/) (CInt    x) (CInt    y) = CInt $ x `div` y
@@ -68,7 +65,7 @@ instance Fractional (CVar a) where
   (/) (CDouble x) (CDouble y) = CDouble $ x / y
   (/) (CDouble x) (CInt    y) = CDouble $ x / fromIntegral y
 
-nnot :: CVar a -> CVar a
+nnot :: CVar -> CVar
 nnot (CBool a) = CBool $ Prelude.not a
 nnot _         = undefined
 
@@ -82,80 +79,82 @@ nnot _         = undefined
 результата одно значение.
 -}
 
-type Ref expr a = expr (VarWrap expr (CVar a))
+type Ref expr = expr (VarWrap expr CVar)
 
 class (Monad expr, MonadFail expr) => CExpr expr where
   type VarWrap expr :: * -> *  -- type synonym
   
-  cVarWrap :: CVar a -> expr (CVar a)
+  mkRef :: Type -> Ref expr  
+  
+  cVarWrap :: CVar -> expr CVar
 
   infix 4 @=
-  (@=) :: Ref expr a -> expr (CVar a) -> expr ()
+  (@=) :: Ref expr -> expr CVar -> expr ()
 
   infix 4 @>
-  (@>) :: expr (CVar a) -> expr (CVar a) -> expr (CVar Bool)
+  (@>) :: expr CVar -> expr CVar -> expr CVar
 
   infix 4 @>=
-  (@>=) :: expr (CVar a) -> expr (CVar a) -> expr (CVar Bool)
+  (@>=) :: expr CVar -> expr CVar -> expr CVar
 
   infix 4 @<
-  (@<) :: expr (CVar a) -> expr (CVar a) -> expr (CVar Bool)
+  (@<) :: expr CVar -> expr CVar -> expr CVar
 
   infix 4 @<=
-  (@<=) :: expr (CVar a) -> expr (CVar a) -> expr (CVar Bool)
+  (@<=) :: expr CVar -> expr CVar -> expr CVar
 
   infix 4 @==
-  (@==) :: expr (CVar a) -> expr (CVar a) -> expr (CVar Bool)
+  (@==) :: expr CVar -> expr CVar -> expr CVar
 
   infix 4 @/=
-  (@/=) :: expr (CVar a) -> expr (CVar a) -> expr (CVar Bool)
+  (@/=) :: expr CVar -> expr CVar -> expr CVar
 
   infixl 6 @+
-  (@+) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
+  (@+) :: expr CVar -> expr CVar -> expr CVar
 
   infixl 6 @-
-  (@-) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
+  (@-) :: expr CVar -> expr CVar -> expr CVar
 
   infixl 7 @*
-  (@*) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
+  (@*) :: expr CVar -> expr CVar -> expr CVar
 
   infixl 7 @/
-  (@/) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
+  (@/) :: expr CVar -> expr CVar -> expr CVar
 
   infixr 3 @&&
-  (@&&) :: expr (CVar Bool) -> expr (CVar Bool) -> expr (CVar Bool)
+  (@&&) :: expr CVar -> expr CVar -> expr CVar
 
   infixr 2 @||
-  (@||) :: expr (CVar Bool) -> expr  (CVar Bool) -> expr (CVar Bool)
+  (@||) :: expr CVar -> expr  CVar -> expr CVar
 
   infix 0 #
-  (#) :: expr (CVar a) -> expr (CVar a) -> expr (CVar a)
+  (#) :: expr CVar -> expr CVar -> expr CVar
 
-  not :: expr (CVar Bool) -> expr (CVar Bool)
+  not :: expr CVar -> expr CVar
 
-  neg :: expr (CVar a) -> expr (CVar a)
+  neg :: expr CVar -> expr CVar
 
-  cWhile :: expr (CVar Bool) -> expr a -> expr ()
+  cWhile :: expr CVar -> expr a -> expr ()
 
-  cIf :: expr (CVar Bool) -> expr a -> expr ()
+  cIf :: expr CVar -> expr a -> expr ()
 
-  cIfElse :: expr (CVar Bool) -> expr a -> expr b -> expr ()
+  cIfElse :: expr CVar -> expr a -> expr b -> expr ()
 
-  cRead :: expr (VarWrap expr (CVar a)) -> expr (CVar a)
+  cRead :: expr (VarWrap expr CVar) -> expr CVar
 
-  cWrite :: expr (CVar a) -> expr ()
+  cWrite :: expr CVar -> expr ()
 
-  cWithVar :: Type -> Name -> expr (CVar a) -> (expr (VarWrap expr (CVar a)) -> expr ()) -> expr ()
+  cWithVar :: Type -> Name -> expr CVar -> (expr (VarWrap expr CVar) -> expr ()) -> expr ()
 
-  cFun0 :: Type -> Name -> (Ref expr r -> expr ()) -> expr (CVar r)
+  cFun0 :: Type -> Name -> (Ref expr -> expr ()) -> expr CVar
 
-  cFun1 :: Type -> Name -> (Ref expr r -> Ref expr a -> expr ()) -> expr (CVar a) -> expr (CVar r)
+  cFun1 :: Type -> Name -> (Ref expr -> Ref expr -> expr ()) -> expr CVar -> expr CVar
 
-  cFun2 :: Type -> Name -> (Ref expr r -> Ref expr a -> Ref expr b -> expr ()) -> expr (CVar a) -> expr (CVar b) -> expr (CVar r)
+  cFun2 :: Type -> Name -> (Ref expr -> Ref expr -> Ref expr -> expr ()) -> expr CVar -> expr CVar  -> expr CVar
 
-  cReadVar :: Ref expr a -> expr (CVar a)
+  cReadVar :: Ref expr -> expr CVar
 
-  cCallFun :: Name -> [Name] -> expr (CVar r) -> expr (CVar r)
+  cCallFun :: Name -> [Name] -> expr CVar -> expr CVar
   
   cVarWrap = pure
   (@>) = liftComp (>)
@@ -178,10 +177,10 @@ class (Monad expr, MonadFail expr) => CExpr expr where
   a # b = a >> b
   cCallFun _ _ expr = expr
 
-interpretCDSLWithST :: (forall s. ST s (CVar a)) -> CVar a
+interpretCDSLWithST :: (forall s. ST s CVar) -> CVar
 interpretCDSLWithST = runST
 
-typeDefault :: Type -> CVar a
+typeDefault :: Type -> CVar
 typeDefault "int"    = CInt 0
 typeDefault "double" = CDouble 0
 typeDefault "string" = CString ""
@@ -190,6 +189,7 @@ typeDefault _        = undefined
 
 instance CExpr IO where
   type VarWrap IO = IORef
+  mkRef vType = newIORef $ typeDefault vType
   (@=) = assignImpl writeIORef
   cFun0 = cFun0Impl newIORef readIORef
   cFun1 fType name func var = do
@@ -201,7 +201,7 @@ instance CExpr IO where
     _ <- func (pure res') (pure arg')
     readIORef res'
   cFun2 fType name func var1 var2 = do
-    let res = newIORef $ typeDefault fType
+    let res = mkRef fType
     res' <- res
     var1' <- var1
     var2' <- var2
@@ -221,6 +221,7 @@ instance CExpr IO where
 
 instance CExpr (ST s) where
   type VarWrap (ST s) = STRef s
+  mkRef vType = newSTRef $ typeDefault vType
   (@=) = assignImpl writeSTRef
   cFun0 = cFun0Impl newSTRef readSTRef
   cFun1 fType name func var = do
@@ -232,7 +233,7 @@ instance CExpr (ST s) where
     _ <- func (pure res') (pure arg')
     readSTRef res'
   cFun2 fType name func var1 var2 = do
-    let res = newSTRef $ typeDefault fType
+    let res = mkRef fType
     res' <- res
     var1' <- var1
     var2' <- var2
@@ -258,52 +259,52 @@ infixr 8 .:
 (.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 (f .: g) x y = f (g x y)
 
-liftComp :: Applicative expr => (a -> a -> Bool) -> expr a -> expr a -> expr (CVar Bool)
+liftComp :: Applicative expr => (a -> a -> Bool) -> expr a -> expr a -> expr CVar
 liftComp op = (CBool <$>) .: liftA2 op
 
-liftBoolBinop :: (Monad expr, MonadFail expr) => (Bool -> Bool -> Bool) -> expr (CVar Bool) -> expr (CVar Bool) -> expr (CVar Bool)
+liftBoolBinop :: (Monad expr, MonadFail expr) => (Bool -> Bool -> Bool) -> expr CVar -> expr CVar -> expr CVar
 liftBoolBinop op x y = do
   (CBool x') <- x
   (CBool y') <- y
   pure $ CBool $ op x' y'
 
-type WriteRef expr a = VarWrap expr (CVar a) -> CVar a -> expr ()
-type NewRef expr a = CVar a -> expr (VarWrap expr (CVar a))
-type ReadRef expr a = VarWrap expr (CVar a) -> expr (CVar a)
+type WriteRef expr = VarWrap expr CVar -> CVar -> expr ()
+type NewRef expr = CVar -> expr (VarWrap expr CVar)
+type ReadRef expr = VarWrap expr CVar -> expr CVar
 
-assignImpl :: Monad expr => WriteRef expr a -> Ref expr a -> expr (CVar a) -> expr ()
+assignImpl :: Monad expr => WriteRef expr -> Ref expr -> expr CVar -> expr ()
 assignImpl writeRef ref val = do
   ref' <- ref
   val' <- val
   writeRef ref' val'
 
-cFun0Impl :: Monad expr => NewRef expr r -> ReadRef expr r -> Type -> Name -> (Ref expr r -> expr ()) -> expr (CVar r)
+cFun0Impl :: Monad expr => NewRef expr -> ReadRef expr -> Type -> Name -> (Ref expr -> expr ()) -> expr CVar
 cFun0Impl newRef readRef fType _ func = do
   let res = newRef $ typeDefault fType
   res' <- res
   _ <- func (pure res')
   readRef res'
 
-cIfImpl :: (Monad expr, MonadFail expr) => expr (CVar Bool) -> expr a -> expr ()
+cIfImpl :: (Monad expr, MonadFail expr) => expr CVar -> expr a -> expr ()
 cIfImpl pred expr = do
   (CBool pred') <- pred
   if pred'
   then expr >> pure ()
   else pure ()
 
-cIfElseImpl :: (Monad expr, MonadFail expr) => expr (CVar Bool) -> expr a -> expr b -> expr ()
+cIfElseImpl :: (Monad expr, MonadFail expr) => expr CVar -> expr a -> expr b -> expr ()
 cIfElseImpl pred x y = do
   (CBool pred') <- pred
   if pred'
   then x >> pure ()
   else y >> pure ()
 
-cWhileImpl :: (Monad expr, MonadFail expr) => expr (CVar Bool) -> expr a -> expr ()
+cWhileImpl :: (Monad expr, MonadFail expr) => expr CVar -> expr a -> expr ()
 cWhileImpl pred x = do
   (CBool pred') <- pred
   whileM_ (pure pred') x
 
-readVar :: CVar a -> IO (CVar a)
+readVar :: CVar -> IO CVar
 readVar to =
   case to of
     CInt _    -> CInt <$> readLn
