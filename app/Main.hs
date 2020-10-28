@@ -6,9 +6,7 @@ import Grammar(Program(..), FunType(..), ValType(..))
 import System.IO
 
 main :: IO()
-main = do
-  s <-  getLine
-  print (parseCPP . alexScanTokens $ s) 
+main = pure ()
   
 -- main = do
   -- res <- test
