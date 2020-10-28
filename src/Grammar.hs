@@ -26,7 +26,10 @@ data ValType
   deriving (Eq, Show)
 
 data FunType 
-  = ValType
+  = FIntType 
+  | FDoubleType 
+  | FBoolType 
+  | FStringType
   | VoidType
   deriving (Eq, Show)
 
