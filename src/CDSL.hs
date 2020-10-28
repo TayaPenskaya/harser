@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module CDSL
 ( CVar(..)
@@ -8,6 +10,7 @@ module CDSL
 , Type
 , Name
 , interpretCDSLWithST
+, CVarW
 ) where
 
 import Control.Applicative (liftA2)
@@ -17,9 +20,14 @@ import Control.Monad.ST (runST)
 import Control.Monad.ST.Strict (ST)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
+import Data.Data (Typeable)
+import Control.Monad.Fail (MonadFail)
 
 type Type = String
 type Name = String
+
+data CVarW where
+  CVarW :: (Typeable a, Show a) => CVar a -> CVarW
 
 -- Типы данных: числа целые и с плавающей точкой, строки и булы.
 data CVar a
