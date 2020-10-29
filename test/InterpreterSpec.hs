@@ -14,6 +14,7 @@ spec = describe "tests for interpreter" $ do
     testInterpretOneVar
     testInterpretTwoVar
     testInterpretArithmetic
+    testInterpretIfElse
 
 testInterpretEmpty :: SpecWith (Arg Expectation)
 testInterpretEmpty = 
@@ -35,7 +36,7 @@ testInterpretTwoVar =
   uTest
     "interpreting two vars program"
     (interpretCDSLWithST $ interpretProgram $ parseCPP $ alexScanTokens twoVarProgram)
-    (CInt 0)
+    (CInt 1)
 
 testInterpretArithmetic :: SpecWith (Arg Expectation)
 testInterpretArithmetic = 
@@ -43,3 +44,11 @@ testInterpretArithmetic =
     "interpreting arithmetic program"
     (interpretCDSLWithST $ interpretProgram $ parseCPP $ alexScanTokens arithmeticExprProgram)
     (CInt 912)
+    
+testInterpretIfElse :: SpecWith (Arg Expectation)
+testInterpretIfElse = 
+  uTest
+    "interpreting if else program"
+    (interpretCDSLWithST $ interpretProgram $ parseCPP $ alexScanTokens ifElseProgram)
+    (CInt 5)
+    
