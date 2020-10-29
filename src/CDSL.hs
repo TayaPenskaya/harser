@@ -154,7 +154,7 @@ class (Monad expr, MonadFail expr) => CExpr expr where
 
   cReadVar :: Ref expr -> expr CVar
 
-  cCallFun :: Name -> [Name] -> expr CVar -> expr CVar
+  cCallFun :: Name -> expr CVar -> expr CVar
   
   cVarWrap = pure
   (@>) = liftComp (>)
@@ -175,7 +175,7 @@ class (Monad expr, MonadFail expr) => CExpr expr where
   cIfElse = cIfElseImpl
   cWhile = cWhileImpl
   a # b = a >> b
-  cCallFun _ _ expr = expr
+  cCallFun _ expr = expr
 
 interpretCDSLWithST :: (forall s. ST s CVar) -> CVar
 interpretCDSLWithST = runST
