@@ -16,11 +16,12 @@ import Control.Monad.State.Strict (StateT, get, evalStateT, modify)
 
 import Control.Monad.Reader (Reader, runReader, ask)
 
-import qualified Data.Map as HM (Map (..), lookup, insert, empty, keys)
+import qualified Data.Map as HM (Map (..), lookup, insert, empty, keys, assocs)
 import Data.List (find)
 import Data.Maybe (fromMaybe, fromJust)
 import Control.Applicative (liftA2)
 import Debug.Trace (trace)
+import Data.Map.Strict (assocs)
 
 type Funs = HM.Map String Fun
 
@@ -214,7 +215,7 @@ interpretStmt fName stmt stmts = do
       let maybeVar = HM.lookup vName vars
       case maybeVar of
         Just _ -> error $ "Variable `" ++ vName ++ "` already exists"
-        Nothing -> pure $ 
+        Nothing -> pure $
           cWithVar
             (interpretValType vType)
             vName
@@ -225,9 +226,7 @@ interpretStmt fName stmt stmts = do
       let maybeVar = HM.lookup vName vars
       case maybeVar of
         Nothing -> error $ "Undefined variable `" ++ vName ++ "`"
-        Just var -> do
-          pure $ var @= rhs
-          interpretStmts fName stmts
+        Just var -> pure (var @= rhs # runStmts fName funs vars stmts)
     ReturnStmt expr -> do
         rhs <- interpretExpr expr
         let maybeRetVar = HM.lookup fName vars
@@ -237,14 +236,30 @@ interpretStmt fName stmt stmts = do
     Fun0Stmt {} -> interpretFunStmt stmt
     Fun1Stmt {} -> interpretFunStmt stmt
     Fun2Stmt {} -> interpretFunStmt stmt
-    -- IfStmt expr stmts -> do
-    --   cIf (interpretExpr expr) stmts
-    --   interpretStmts stmts
+
+    IfStmt expr ifStmts -> do
+      expr' <- interpretExpr expr
+      pure $ cIf expr' (\_ -> runStmts fName funs vars (ifStmts ++ stmts))
+    IfElseStmt expr thenStmts elseStmts -> do
+      expr' <- interpretExpr expr
+      pure $ cIfElse expr' 
+        (\_ ->  runStmts fName funs vars (thenStmts ++ stmts)) 
+        (\_ ->  runStmts fName funs vars (elseStmts ++ stmts))
 
 showFName :: Grammar.Name -> String
 showFName (namespace, fName) = namespace ++ "::" ++ fName
 
---
+traceVars :: CExpr expr => Vars expr -> expr a -> expr a
+traceVars vars ret =
+  let refs = assocs vars
+   in trace "vars: " (go refs ret)
+  where
+    go :: CExpr expr => [(String, Ref expr)] -> expr a -> expr a
+    go [] ret = ret
+    go ((vName, vRef):xs) ret = do
+      value <- cReadVar vRef
+      trace ("{" ++ vName ++ ": " ++ show value ++ "}, ") (go xs ret)
+--      
 -- ERRORS
 --
 
