@@ -12,8 +12,7 @@ import Grammar (Expr (..), Fun (..), FunType (..),
                 Value (..), Name)
 import CDSL (CExpr (..), CVar (..), Type, Ref)
 
-import Control.Monad.State (StateT, get, evalStateT, modify)
-
+import Control.Monad.State.Strict (StateT, get, evalStateT, modify)
 import Control.Monad.Reader (Reader, runReader, ask)
 
 import qualified Data.Map as HM (Map (..), lookup, insert, empty)
@@ -21,6 +20,7 @@ import Data.List (find)
 import Data.Maybe (fromMaybe, fromJust)
 import Control.Applicative (liftA2)
 
+import Debug.Trace(trace)
 
 type Funs = HM.Map String Fun
 
@@ -67,6 +67,7 @@ funName (Fun2 _ name _ _ _ _ _) = name
 --
 
 interpretFun :: CExpr expr => Fun -> FunState expr (expr CVar)
+interpretFun fun | trace ("interpretFun: " ++ show fun) False = undefined
 interpretFun fun =
   case fun of
     Fun0 fType fName stmts -> do
@@ -127,12 +128,14 @@ interpretFunType FStringType = "string"
 interpretFunType VoidType = "void"
 
 interpretValue :: CExpr expr => Value -> expr CVar
+interpretValue v | trace ("interpretValue: " ++ show v) False = undefined
 interpretValue (IntValue v) = cVarWrap (CInt v)
 interpretValue (StringValue v) = cVarWrap (CString v)
 interpretValue (DoubleValue v) = cVarWrap (CDouble v)
 interpretValue (BoolValue v) = cVarWrap (CBool v)
 
 interpretExpr :: CExpr expr => Expr -> FunState expr (expr CVar)
+interpretExpr expr | trace ("interpretExpr: " ++ show expr) False = undefined
 interpretExpr (ExprPlus expr1 expr2) = liftA2 (@+) (interpretExpr expr1) (interpretExpr expr2)
 interpretExpr (ExprMinus expr1 expr2) = liftA2 (@-) (interpretExpr expr1) (interpretExpr expr2)
 interpretExpr (ExprMul expr1 expr2) = liftA2 (@*) (interpretExpr expr1) (interpretExpr expr2)
@@ -186,10 +189,12 @@ interpretExpr (ExprVal val) = pure $ interpretValue val
 
 -- (a -> b -> b) -> b -> [a] -> b
 interpretStmts :: CExpr expr => String -> [Stmt] -> FunState expr (expr ())
+-- interpretStmts fName stmts | trace ("interpretStmts: " ++ show stmts) False = undefined
 interpretStmts fName [x] = interpretStmt fName x
 interpretStmts fName (x:xs) = interpretStmt fName x >> interpretStmts fName xs
 
 interpretStmt :: CExpr expr => String -> Stmt -> FunState expr (expr ())
+-- interpretStmt fName stmt | trace ("interpretStmt: " ++ show stmt) False = undefined
 interpretStmt fName stmt = case stmt of
   AssignStmt vType vName expr -> do
     vars <- get
