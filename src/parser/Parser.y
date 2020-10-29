@@ -95,7 +95,7 @@ statements
 
 statement
 	: simple_statement ';'              { $1 }
-    | compound_statement ';'            { $1 }
+    | compound_statement                { $1 }
     
 simple_statement
     : vtype NAME '=' expr            { AssignStmt $1 $2 $4 }

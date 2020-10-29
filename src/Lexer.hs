@@ -791,8 +791,8 @@ alex_action_37 =  \_ -> TRPar
 alex_action_38 =  \_ -> TLBr 
 alex_action_39 =  \_ -> TRBr 
 alex_action_40 =  \_ -> TAssign 
-alex_action_41 =  \s -> TInt (read s) 
-alex_action_42 =  \s -> TDouble (read s) 
+alex_action_41 =  \s -> TInt (read s :: Int) 
+alex_action_42 =  \s -> TDouble (read s :: Double) 
 alex_action_43 =  \s -> TString s 
 alex_action_44 =  \s -> TName s 
 {-# LINE 1 "templates/GenericTemplate.hs" #-}

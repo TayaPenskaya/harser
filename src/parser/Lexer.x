@@ -66,8 +66,8 @@ tokens :-
 
     \=                                          { \_ -> TAssign }
 
-    $digit+                                     { \s -> TInt (read s) }
-    $digit+ \. $digit+                          { \s -> TDouble (read s) }
+    $digit+                                     { \s -> TInt (read s :: Int) }
+    $digit+ \. $digit+                          { \s -> TDouble (read s :: Double) }
     \"[^\"]*\"                                  { \s -> TString s }
     $alpha ([a-za-z0-9_])*                      { \s -> TName s }
 
