@@ -16,12 +16,12 @@ module CDSL
 import Control.Applicative (liftA2)
 import Control.Monad.Extra (ifM)
 import Control.Monad.Loops (whileM_)
-import Control.Monad.ST (runST)
-import Control.Monad.ST.Strict (ST)
+import Control.Monad.ST.Strict (ST, runST)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
 import Data.Data (Typeable)
 import Control.Monad.Fail (MonadFail)
+import Debug.Trace (trace)
 
 type Type = String
 type Name = String
@@ -84,7 +84,11 @@ type Ref expr = expr (VarWrap expr CVar)
 class (Monad expr, MonadFail expr) => CExpr expr where
   type VarWrap expr :: * -> *  -- type synonym
   
-  mkRef :: Type -> Ref expr  
+  newRef :: CVar -> Ref expr
+  readRef :: VarWrap expr CVar -> expr CVar
+  writeRef :: VarWrap expr CVar -> CVar -> expr ()
+  mkRef :: String -> Ref expr
+  mkRef vType = newRef $ typeDefault vType
   
   cVarWrap :: CVar -> expr CVar
 
@@ -140,11 +144,11 @@ class (Monad expr, MonadFail expr) => CExpr expr where
 
   cIfElse :: expr CVar -> expr a -> expr b -> expr ()
 
-  cRead :: expr (VarWrap expr CVar) -> expr CVar
+  cRead :: Ref expr -> expr CVar
 
   cWrite :: expr CVar -> expr ()
 
-  cWithVar :: Type -> Name -> expr CVar -> (expr (VarWrap expr CVar) -> expr ()) -> expr ()
+  cWithVar :: Type -> Name -> expr CVar -> (Ref expr -> expr ()) -> expr ()
 
   cFun0 :: Type -> Name -> (Ref expr -> expr ()) -> expr CVar
 
@@ -157,6 +161,11 @@ class (Monad expr, MonadFail expr) => CExpr expr where
   cCallFun :: Name -> expr CVar -> expr CVar
   
   cVarWrap = pure
+  ref @= val = do
+    ref' <- ref
+    val' <- val
+    writeRef ref' val'
+    
   (@>) = liftComp (>)
   (@>=) = liftComp (>=)
   (@<) = liftComp (<)
@@ -171,15 +180,58 @@ class (Monad expr, MonadFail expr) => CExpr expr where
   (@||) = liftBoolBinop (||)
   neg = fmap negate
   not = fmap nnot
-  cIf = cIfImpl
-  cIfElse = cIfElseImpl
-  cWhile = cWhileImpl
+  
+  cIf pred expr = do
+    (CBool pred') <- pred
+    if pred'
+    then expr >> pure ()
+    else pure ()
+  cIfElse pred x y = do
+    (CBool pred') <- pred
+    if pred'
+    then x >> pure ()
+    else y >> pure ()
+  cWhile pred x = do
+    (CBool pred') <- pred
+    whileM_ (pure pred') x
+    
   a # b = a >> b
   cCallFun _ expr = expr
-
-interpretCDSLWithST :: (forall s. ST s CVar) -> CVar
-interpretCDSLWithST = runST
-
+  cWithVar vType name value assign = trace ("cWithVar: " ++ name) $ do
+    value' <- value
+    let newVarRef = newRef value'
+    newVarRef' <- newVarRef
+    assign (pure newVarRef')
+  
+  cFun0 fType _ func = do
+    let res = mkRef fType
+    res' <- res
+    _ <- func (pure res')
+    readRef res'
+  
+  cFun1 fType name func var = do
+    let res = mkRef fType
+    res' <- res
+    var' <- var
+    let arg = newRef var'
+    arg' <- arg
+    _ <- func (pure res') (pure arg')
+    readRef res'  
+    
+  cFun2 fType name func var1 var2 = do
+    let res = mkRef fType
+    res' <- res
+    var1' <- var1
+    var2' <- var2
+    let arg1 = newRef var1'
+    arg1' <- arg1
+    let arg2 = newRef var2'
+    arg2' <- arg2
+    _ <- func (pure res') (pure arg1') (pure arg2')
+    readRef res' 
+    
+  cReadVar a = a >>= readRef
+    
 typeDefault :: Type -> CVar
 typeDefault "int"    = CInt 0
 typeDefault "double" = CDouble 0
@@ -189,67 +241,22 @@ typeDefault _        = undefined
 
 instance CExpr IO where
   type VarWrap IO = IORef
-  mkRef vType = newIORef $ typeDefault vType
-  (@=) = assignImpl writeIORef
-  cFun0 = cFun0Impl newIORef readIORef
-  cFun1 fType name func var = do
-    let res = newIORef $ typeDefault fType
-    res' <- res
-    var' <- var
-    let arg = newIORef var'
-    arg' <- arg
-    _ <- func (pure res') (pure arg')
-    readIORef res'
-  cFun2 fType name func var1 var2 = do
-    let res = mkRef fType
-    res' <- res
-    var1' <- var1
-    var2' <- var2
-    let arg1 = newIORef var1'
-    arg1' <- arg1
-    let arg2 = newIORef var2'
-    arg2' <- arg2
-    _ <- func (pure res') (pure arg1') (pure arg2')
-    readIORef res'
+  newRef = newIORef
+  readRef = readIORef
+  writeRef = writeIORef
+  cRead ref = ref >>= readRef >>= readVar
   cWrite buf = buf >>= print
-  cRead ref = ref >>= readIORef >>= readVar
-  cReadVar a = a >>= readIORef
-  cWithVar vType name value assign = do
-    let newVarRef = newIORef $ typeDefault vType
-    newVarRef' <- newVarRef
-    assign (pure newVarRef')
 
 instance CExpr (ST s) where
   type VarWrap (ST s) = STRef s
-  mkRef vType = newSTRef $ typeDefault vType
-  (@=) = assignImpl writeSTRef
-  cFun0 = cFun0Impl newSTRef readSTRef
-  cFun1 fType name func var = do
-    let res = newSTRef $ typeDefault fType
-    res' <- res
-    var' <- var
-    let arg = newSTRef var'
-    arg' <- arg
-    _ <- func (pure res') (pure arg')
-    readSTRef res'
-  cFun2 fType name func var1 var2 = do
-    let res = mkRef fType
-    res' <- res
-    var1' <- var1
-    var2' <- var2
-    let arg1 = newSTRef var1'
-    arg1' <- arg1
-    let arg2 = newSTRef var2'
-    arg2' <- arg2
-    _ <- func (pure res') (pure arg1') (pure arg2')
-    readSTRef res'
-  cReadVar a = a >>= readSTRef
-  cWithVar vType name value assign = do
-    let newVarRef = newSTRef $ typeDefault vType
-    newVarRef' <- newVarRef
-    assign (pure newVarRef')
+  newRef = newSTRef
+  readRef = readSTRef
+  writeRef = writeSTRef
   cRead = errorIO
   cWrite = errorIO
+  
+interpretCDSLWithST :: (forall s. ST s CVar) -> CVar
+interpretCDSLWithST = runST  
 
 {-
 * Helpers:
@@ -267,42 +274,6 @@ liftBoolBinop op x y = do
   (CBool x') <- x
   (CBool y') <- y
   pure $ CBool $ op x' y'
-
-type WriteRef expr = VarWrap expr CVar -> CVar -> expr ()
-type NewRef expr = CVar -> expr (VarWrap expr CVar)
-type ReadRef expr = VarWrap expr CVar -> expr CVar
-
-assignImpl :: Monad expr => WriteRef expr -> Ref expr -> expr CVar -> expr ()
-assignImpl writeRef ref val = do
-  ref' <- ref
-  val' <- val
-  writeRef ref' val'
-
-cFun0Impl :: Monad expr => NewRef expr -> ReadRef expr -> Type -> Name -> (Ref expr -> expr ()) -> expr CVar
-cFun0Impl newRef readRef fType _ func = do
-  let res = newRef $ typeDefault fType
-  res' <- res
-  _ <- func (pure res')
-  readRef res'
-
-cIfImpl :: (Monad expr, MonadFail expr) => expr CVar -> expr a -> expr ()
-cIfImpl pred expr = do
-  (CBool pred') <- pred
-  if pred'
-  then expr >> pure ()
-  else pure ()
-
-cIfElseImpl :: (Monad expr, MonadFail expr) => expr CVar -> expr a -> expr b -> expr ()
-cIfElseImpl pred x y = do
-  (CBool pred') <- pred
-  if pred'
-  then x >> pure ()
-  else y >> pure ()
-
-cWhileImpl :: (Monad expr, MonadFail expr) => expr CVar -> expr a -> expr ()
-cWhileImpl pred x = do
-  (CBool pred') <- pred
-  whileM_ (pure pred') x
 
 readVar :: CVar -> IO CVar
 readVar to =
