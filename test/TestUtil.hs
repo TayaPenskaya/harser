@@ -69,7 +69,7 @@ twoVarProgram =
 int main() {
   int a = 0;
   int b = a;
-  a = 1;
+  b = 1;
   return b;
 }
 |]
@@ -84,21 +84,22 @@ int main() {
 }
 |]
 
+-- Returns 5
 ifElseProgram :: Program
 ifElseProgram =
   [r|
 int main() {
-  int res = -1;
+  int res = 1;
   if (1 == 2) {
-      res = 1;
+      res = 2;
   } else {
       if (3 > 2) {
-          res = 2;
+          res = 3;
       }
-      if (res == 2) {
-          res = 0;
+      if (res == 1) {
+          res = 4;
       } else {
-          res = -1;
+          res = 5;
       }
   }
   return res;
