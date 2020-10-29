@@ -40,9 +40,7 @@ library
       base >=4.7 && <5
     , array 
     , extra
-    , monad-loops
     , mtl
-    , transformers
     , containers
   default-language: Haskell2010
 
