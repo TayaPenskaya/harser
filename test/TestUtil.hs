@@ -74,12 +74,12 @@ int main() {
 }
 |]
 
--- Returns 73
+-- Returns 912
 arithmeticExprProgram :: Program
 arithmeticExprProgram =
   [r|
 int main() {
-  int a = (10 + 1) * (255 >> 3) / 3 - (10 << 2); // 73
+  int a = (10 + 1) * (255 - 3) / 3 - (10 + 2);
   return a;
 }
 |]
