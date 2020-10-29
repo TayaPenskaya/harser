@@ -91,7 +91,7 @@ ifElseProgram =
 int main() {
   int res = 1;
   if (1 == 2) {
-      res = 2;
+      int res = 2;
   } else {
       if (3 > 2) {
           res = 3;
@@ -106,13 +106,14 @@ int main() {
 }
 |]
 
+-- Return 1
 whileProgram :: Program
 whileProgram =
   [r|
 int main() {
   int cnt = 10;
-  while (cnt > 0) {
-      cnt--;
+  while (cnt > 1) {
+      cnt = cnt - 1;
   }
   return cnt;
 }
@@ -130,7 +131,7 @@ int main() {
 }
 |]
 
--- Returns 73
+-- Returns 16
 twoFuncProgram :: Program
 twoFuncProgram =
   [r|
@@ -140,7 +141,7 @@ int f(int x) {
 
 int main() {
   int a = 10;
-  a += f(3); // 16
+  a = a + f(3);
   return a;
 }
 |]
@@ -150,26 +151,26 @@ passByValueProgram :: Program
 passByValueProgram =
   [r|
 int f(int x) {
-  return ++x;
+  return x + 1;
 }
 
 int main() {
   int a = 10;
   int b = f(a);
-  return a + b; // 21
+  return a + b;
 }
 |]
 
--- Returns 21
+-- Returns 1
 differentScopeProgram :: Program
 differentScopeProgram =
   [r|
 void f() {
-    int x = 1;
+    int x = 2;
 }
 
 int main() {
-  int x = 0;
+  int x = 1;
   f();
   return x;
 }
