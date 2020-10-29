@@ -132,7 +132,7 @@ class (Monad expr, MonadFail expr) => CExpr expr where
   (@||) :: expr CVar -> expr  CVar -> expr CVar
 
   infix 0 #
-  (#) :: expr CVar -> expr CVar -> expr CVar
+  (#) :: expr () -> expr () -> expr ()
 
   not :: expr CVar -> expr CVar
 
@@ -140,9 +140,9 @@ class (Monad expr, MonadFail expr) => CExpr expr where
 
   cWhile :: expr CVar -> expr a -> expr ()
 
-  cIf :: expr CVar -> expr a -> expr ()
+  cIf :: expr CVar -> (() -> expr ()) -> expr ()
 
-  cIfElse :: expr CVar -> expr a -> expr b -> expr ()
+  cIfElse :: expr CVar -> (() -> expr ()) -> (() -> expr ()) -> expr ()
 
   cRead :: Ref expr -> expr CVar
 
@@ -181,19 +181,16 @@ class (Monad expr, MonadFail expr) => CExpr expr where
   neg = fmap negate
   not = fmap nnot
   
-  cIf pred expr = do
+  cIf pred runStmt = do
     (CBool pred') <- pred
     if pred'
-    then expr >> pure ()
+    then runStmt ()
     else pure ()
-  cIfElse pred x y = do
+  cIfElse pred runThenStmt runElseStmt = do
     (CBool pred') <- pred
     if pred'
-    then x >> pure ()
-    else y >> pure ()
-  cWhile pred x = do
-    (CBool pred') <- pred
-    whileM_ (pure pred') x
+    then runThenStmt ()
+    else runElseStmt ()
     
   a # b = a >> b
   cCallFun _ expr = expr
