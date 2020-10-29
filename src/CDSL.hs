@@ -15,7 +15,6 @@ module CDSL
 
 import Control.Applicative (liftA2)
 import Control.Monad.Extra (ifM)
-import Control.Monad.Loops (whileM_)
 import Control.Monad.ST.Strict (ST, runST)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
@@ -138,7 +137,7 @@ class (Monad expr, MonadFail expr) => CExpr expr where
 
   neg :: expr CVar -> expr CVar
 
-  cWhile :: expr CVar -> expr a -> expr ()
+  cWhile :: (() -> expr CVar) -> (() -> expr ()) -> (() -> expr ()) -> expr ()
 
   cIf :: expr CVar -> (() -> expr ()) -> expr ()
 
@@ -191,6 +190,13 @@ class (Monad expr, MonadFail expr) => CExpr expr where
     if pred'
     then runThenStmt ()
     else runElseStmt ()
+  cWhile runPred runStmt runNext = go
+   where 
+      go = do
+        (CBool pred') <- runPred ()
+        if pred'
+        then runStmt () >> go
+        else runNext ()
     
   a # b = a >> b
   cCallFun _ expr = expr
