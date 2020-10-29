@@ -70,35 +70,48 @@ interpretFun :: CExpr expr => Fun -> FunState expr (expr CVar)
 interpretFun fun =
   case fun of
     Fun0 fType fName stmts -> do
-      modify $ insertRetVar fType fName
+      let retVar = mkRef (interpretFunType fType)
+      modify $ HM.insert fName retVar
       interpretStmts fName stmts
+      pure $ cReadVar retVar
     Fun1 fType fName vType vName stmts -> do
-      modify $ insertRetVar fType fName
+      let retVar = mkRef (interpretFunType fType)
+      modify $ HM.insert fName retVar
       modify $ insertVar vType vName
       interpretStmts fName stmts
+      pure $ cReadVar retVar
     Fun2 fType fName v1Type v1Name v2Type v2Name stmts -> do
-      modify $ insertRetVar fType fName
+      let retVar = mkRef (interpretFunType fType)
+      modify $ HM.insert fName retVar
       modify $ insertVar v1Type v1Name
-      modify $ insertVar v2Type v1Name
+      modify $ insertVar v2Type v2Name
       interpretStmts fName stmts
+      pure $ cReadVar retVar
 
 interpretCallFun :: CExpr expr => Fun -> [expr CVar] -> FunState expr (expr CVar)
 interpretCallFun fun args =
   case fun of
     Fun0 fType fName stmts -> do
-      modify $ insertRetVar fType fName
+      let retVar = mkRef (interpretFunType fType)
+      modify $ HM.insert fName retVar
       interpretStmts fName stmts
+      pure $ cReadVar retVar
     Fun1 fType fName vType vName stmts -> do
-      modify $ insertRetVar fType fName
+      let retVar = mkRef (interpretFunType fType)
+      modify $ HM.insert fName retVar
       let argRef = mkRef $ interpretValType vType
       pure $ argRef @= head args
       modify $ HM.insert vName argRef 
       interpretStmts fName stmts
+      pure $ cReadVar retVar
     Fun2 fType fName v1Type v1Name v2Type v2Name stmts -> do
+      let retVar = mkRef (interpretFunType fType)
+      modify $ HM.insert fName retVar
       modify $ insertRetVar fType fName
       modify $ insertVar v1Type v1Name
       modify $ insertVar v2Type v1Name
       interpretStmts fName stmts
+      pure $ cReadVar retVar
 
 interpretValType :: ValType -> String
 interpretValType IntType = "int"
@@ -168,11 +181,13 @@ interpretExpr (ExprFun2 (namespace, fname) expr1 expr2) = do
       arg2 <- interpretExpr expr2
       res <- interpretCallFun f [arg1, arg2]
       pure $ cCallFun fname res 
+interpretExpr (ExprVal val) = pure $ interpretValue val
 
 
 -- (a -> b -> b) -> b -> [a] -> b
-interpretStmts :: CExpr expr => String -> [Stmt] -> FunState expr (expr CVar)
-interpretStmts fName stmts = undefined
+interpretStmts :: CExpr expr => String -> [Stmt] -> FunState expr (expr ())
+interpretStmts fName [x] = interpretStmt fName x
+interpretStmts fName (x:xs) = interpretStmt fName x >> interpretStmts fName xs
 
 interpretStmt :: CExpr expr => String -> Stmt -> FunState expr (expr ())
 interpretStmt fName stmt = case stmt of
