@@ -77,6 +77,12 @@ runStmts fName funs vars stmts =
     (evalStateT (interpretStmts fName stmts) vars)
     funs
 
+runExpr :: CExpr expr => Funs -> Vars expr -> Expr -> expr CVar
+runExpr funs vars expr =
+  runReader
+    (evalStateT (interpretExpr expr) vars)
+    funs
+
 insertVar :: CExpr expr => String -> Ref expr -> Vars expr -> Vars expr
 insertVar vName vRef = insertVars [(vName, vRef)]
 
@@ -245,6 +251,10 @@ interpretStmt fName stmt stmts = do
       pure $ cIfElse expr' 
         (\_ ->  runStmts fName funs vars (thenStmts ++ stmts)) 
         (\_ ->  runStmts fName funs vars (elseStmts ++ stmts))
+    WhileStmt expr whileStmts -> pure $ cWhile
+       (\_ -> runExpr funs vars expr) 
+       (\_ -> runStmts fName funs vars whileStmts) 
+       (\_ -> runStmts fName funs vars stmts) 
 
 showFName :: Grammar.Name -> String
 showFName (namespace, fName) = namespace ++ "::" ++ fName
@@ -259,7 +269,7 @@ traceVars vars ret =
     go ((vName, vRef):xs) ret = do
       value <- cReadVar vRef
       trace ("{" ++ vName ++ ": " ++ show value ++ "}, ") (go xs ret)
---      
+--
 -- ERRORS
 --
 
