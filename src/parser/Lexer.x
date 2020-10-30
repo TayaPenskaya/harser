@@ -69,7 +69,7 @@ tokens :-
     $digit+                                     { \s -> TInt (read s :: Int) }
     $digit+ \. $digit+                          { \s -> TDouble (read s :: Double) }
     \"[^\"]*\"                                  { \s -> TString s }
-    $alpha ([a-za-z0-9_])*                      { \s -> TName s }
+    $alpha ([a-zA-Z0-9_])*                      { \s -> TName s }
 
 {
 data Token = TFun | TWhile | TIf | TElse | TReturn 
