@@ -14,7 +14,6 @@ module TestUtil
   , twoFuncProgram
   , passByValueProgram
   , differentScopeProgram
-  , eulerFuncProgram
   , gcdProgram
   ) where
 
@@ -42,7 +41,6 @@ validPrograms =
   , twoFuncProgram
   , passByValueProgram
   , differentScopeProgram
-  , eulerFuncProgram
   , gcdProgram
   ]
 
@@ -123,10 +121,11 @@ ioProgram :: Program
 ioProgram =
   [r|
 int main() {
-  int a;
-  cin >> a;
-  a *= 2;
-  cout << "2 * a = " << a;
+  int a = 1;
+  std::cin >> a;
+  a = a * 2;
+  std::cout << "a * 2 = ";
+  std::cout << a;
   return 0;
 }
 |]
@@ -176,37 +175,14 @@ int main() {
 }
 |]
 
-eulerFuncProgram :: Program
-eulerFuncProgram =
-  [r|
-int phi (int n) {
-  int result = n;
-  for (int i = 2; i * i <=n; ++i)
-    if (n % i == 0) {
-      while (n % i == 0)
-        n /= i;
-      result -= result / i;
-    }
-  if (n > 1)
-    result -= result / n;
-  return result;
-}
-
-int main() {
-  int n;
-  cin >> n;
-  cout << phi(n);
-}
- |]
-
 gcdProgram :: Program
 gcdProgram =
   [r|
-int gcd (int a, int b) {
+int gcdSlow (int a, int b) {
 	if (b == 0)
 		return a;
 	else
-		return gcd (b, a % b);
+		return gcd (b, a - b);
 }
 
 int main() {
