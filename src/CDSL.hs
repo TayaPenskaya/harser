@@ -10,7 +10,7 @@ module CDSL
 , Type
 , Name
 , Ref
-, interpretCDSLWithST
+, typeDefault
 ) where
 
 import Control.Applicative (liftA2)
@@ -40,16 +40,19 @@ instance Num CVar where
   (+) (CDouble x) (CDouble y) = CDouble $ x + y
   (+) (CString x) (CString y) = CString $ x ++ y
   (+) (CBool x) (CBool y)     = CBool $ x || y
+  (+) _ _                     = errorNonmatchingTypes
 
   (*) (CInt    x) (CInt    y) = CInt $ x * y
   (*) (CInt    x) (CDouble y) = CDouble $ fromIntegral x * y
   (*) (CDouble x) (CInt    y) = CDouble $ x * fromIntegral y
   (*) (CDouble x) (CDouble y) = CDouble $ x * y
+  (*) _ _                     = errorNonmatchingTypes
 
   (-) (CInt    x) (CInt    y) = CInt $ x - y
   (-) (CInt    x) (CDouble y) = CDouble $ fromIntegral x - y
   (-) (CDouble x) (CInt    y) = CDouble $ x - fromIntegral y
   (-) (CDouble x) (CDouble y) = CDouble $ x - y
+  (-) _ _                     = errorNonmatchingTypes
 
   fromInteger x = CInt $ fromInteger x
 
@@ -63,11 +66,7 @@ instance Fractional CVar where
   (/) (CInt    x) (CDouble y) = CDouble $ fromIntegral x / y
   (/) (CDouble x) (CDouble y) = CDouble $ x / y
   (/) (CDouble x) (CInt    y) = CDouble $ x / fromIntegral y
-
-nnot :: CVar -> CVar
-nnot (CBool a) = CBool $ Prelude.not a
-nnot _         = undefined
-
+  (/) _ _                     = errorNonmatchingTypes
 
 {- 
 * Конструкции для работы с переменными (присваивание, чтение
@@ -80,14 +79,10 @@ nnot _         = undefined
 
 type Ref expr = expr (VarWrap expr CVar)
 
-class (Monad expr, MonadFail expr) => CExpr expr where
+class CExpr expr where
   type VarWrap expr :: * -> *  -- type synonym
   
-  newRef :: CVar -> Ref expr
-  readRef :: VarWrap expr CVar -> expr CVar
-  writeRef :: VarWrap expr CVar -> CVar -> expr ()
-  mkRef :: String -> Ref expr
-  mkRef vType = newRef $ typeDefault vType
+  pur :: a -> expr a
   
   cVarWrap :: CVar -> expr CVar
 
@@ -158,144 +153,15 @@ class (Monad expr, MonadFail expr) => CExpr expr where
   cReadVar :: Ref expr -> expr CVar
 
   cCallFun :: Name -> expr CVar -> expr CVar
-  
-  cVarWrap = pure
-  ref @= val = do
-    ref' <- ref
-    val' <- val
-    writeRef ref' val'
-    
-  (@>) = liftComp (>)
-  (@>=) = liftComp (>=)
-  (@<) = liftComp (<)
-  (@<=) = liftComp (<=)
-  (@==) = liftComp (==)
-  (@/=) = liftComp (/=)
-  (@+) = liftA2 (+)
-  (@-) = liftA2 (-)
-  (@*) = liftA2 (*)
-  (@/) = liftA2 (/)
-  (@&&) = liftBoolBinop (&&)
-  (@||) = liftBoolBinop (||)
-  neg = fmap negate
-  not = fmap nnot
-  
-  cIf pred runStmt runNext = do
-    (CBool pred') <- pred
-    if pred'
-    then runStmt () >> runNext ()
-    else runNext ()
-  cIfElse pred runThenStmt runElseStmt runNext = do
-    (CBool pred') <- pred
-    if pred'
-    then runThenStmt () >> runNext ()
-    else runElseStmt () >> runNext ()
-  cWhile runPred runStmt runNext = go
-   where 
-      go = do
-        (CBool pred') <- runPred ()
-        if pred'
-        then runStmt () >> go
-        else runNext ()
-    
-  a # b = a >> b
-  cCallFun _ expr = expr
-  cWithVar vType name value assign = do
-    value' <- value
-    let newVarRef = newRef value'
-    newVarRef' <- newVarRef
-    assign (pure newVarRef')
-  
-  cFun0 fType _ func = do
-    let res = mkRef fType
-    res' <- res
-    _ <- func (pure res')
-    readRef res'
-  
-  cFun1 fType name func var = do
-    let res = mkRef fType
-    res' <- res
-    var' <- var
-    let arg = newRef var'
-    arg' <- arg
-    _ <- func (pure res') (pure arg')
-    readRef res'  
-    
-  cFun2 fType name func var1 var2 = do
-    let res = mkRef fType
-    res' <- res
-    var1' <- var1
-    var2' <- var2
-    let arg1 = newRef var1'
-    arg1' <- arg1
-    let arg2 = newRef var2'
-    arg2' <- arg2
-    _ <- func (pure res') (pure arg1') (pure arg2')
-    readRef res' 
-    
-  cReadVar a = a >>= readRef
-    
+
 typeDefault :: Type -> CVar
-typeDefault "int"    = CInt 0
-typeDefault "double" = CDouble 0
-typeDefault "string" = CString ""
-typeDefault "bool"   = CBool False
-typeDefault _        = undefined
+typeDefault t =
+  case t of
+    "int" -> CInt 0
+    "double" -> CDouble 0
+    "string" -> CString ""
+    "bool" -> CBool False
+    _ -> undefined
 
-instance CExpr IO where
-  type VarWrap IO = IORef
-  newRef = newIORef
-  readRef = readIORef
-  writeRef = writeIORef
-  cRead ref = do
-    ref' <- ref
-    before <- readRef ref'
-    var <- readVar before
-    writeRef ref' var
-
-  cWrite buf = do
-    buf' <- buf
-    case buf' of
-      CInt i -> putStr $ show i
-      CDouble d -> putStr $ show d
-      CString s -> putStr s
-      CBool b -> putStr $ show b
-
-instance CExpr (ST s) where
-  type VarWrap (ST s) = STRef s
-  newRef = newSTRef
-  readRef = readSTRef
-  writeRef = writeSTRef
-  cRead = errorIO
-  cWrite = errorIO
-  
-interpretCDSLWithST :: (forall s. ST s CVar) -> CVar
-interpretCDSLWithST = runST  
-
-{-
-* Helpers:
--}
-
-infixr 8 .:
-(.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
-(f .: g) x y = f (g x y)
-
-liftComp :: Applicative expr => (a -> a -> Bool) -> expr a -> expr a -> expr CVar
-liftComp op = (CBool <$>) .: liftA2 op
-
-liftBoolBinop :: (Monad expr, MonadFail expr) => (Bool -> Bool -> Bool) -> expr CVar -> expr CVar -> expr CVar
-liftBoolBinop op x y = do
-  (CBool x') <- x
-  (CBool y') <- y
-  pure $ CBool $ op x' y'
-
-readVar :: CVar -> IO CVar
-readVar to =
-  case to of
-    CInt _    -> CInt <$> readLn
-    CDouble _ -> CDouble <$> readLn
-    CString _ -> CString <$> readLn
-    CBool _   -> CBool <$> readLn
-
-errorIO :: a
-errorIO = error "unable to perform IO actions in ST interpreter"
+errorNonmatchingTypes :: a
+errorNonmatchingTypes = error "Unable to perform operation cause nonmatching types for operation"
