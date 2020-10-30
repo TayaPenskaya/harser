@@ -36,30 +36,24 @@ interpretProgram program = let mainMaybe = findMain program in
     Just main -> runProgram program main
 
 runProgram :: CExpr expr => Program -> Fun -> expr CVar
-runProgram program main =
+runProgram program@(Program funs) main =
   runReader
-    (evalStateT (interpretFun main) initialVars)
-    (initialFuns program)
+    (evalStateT (interpretFun main) HM.empty)
+    (funsScope main funs)
 
-initialVars :: CExpr expr => Vars expr
-initialVars = HM.empty
-
-initialFuns :: Program -> Funs
-initialFuns (Program funs) = foldr helper HM.empty $ takeWhileInc (Prelude.not . isNameMain) funs
+funsScope :: Fun -> [Fun] -> Funs
+funsScope fun funs = foldr helper HM.empty $ takeWhileInc (Prelude.not . isName (funName fun)) funs
   where
     helper fun = HM.insert (funName fun) fun
-
+    
 takeWhileInc :: (a -> Bool) -> [a] -> [a]
 takeWhileInc p = foldr (\x ys -> if p x then x:ys else [x]) []
 
-initialState :: CExpr expr => Program -> FunState expr CVar
-initialState program = undefined
-
 findMain :: Program -> Maybe Fun
-findMain (Program funs) = find isNameMain funs
+findMain (Program funs) = find (isName "main") funs
 
-isNameMain :: Fun -> Bool
-isNameMain fun = funName fun == "main"
+isName :: String -> Fun -> Bool
+isName fName fun = funName fun == fName
 
 funName :: Fun -> String
 funName (Fun0 _ name _) = name
@@ -118,7 +112,7 @@ interpretFunExpr exprFun = do
               cFun0
                 (interpretFunType fType)
                 fName
-                (\r -> runStmts fName funs (insertVar fName r vars) stmts)
+                (\r -> runStmts fName funs (insertVar fName r HM.empty) stmts)
 
     ExprFun1 (namespace, fName)  arg -> do
       let maybeFun = HM.lookup fName funs
@@ -133,7 +127,7 @@ interpretFunExpr exprFun = do
               pure $ cFun1
                 (interpretFunType fType)
                 fName
-                (\r argRef -> runStmts fName funs (insertVars [(fName, r), (argName, argRef)] vars) stmts)
+                (\r argRef -> runStmts fName funs (insertVars [(fName, r), (argName, argRef)] HM.empty) stmts)
                 arg'
 
     ExprFun2 (namespace, fName)  arg1 arg2 -> do
@@ -151,7 +145,7 @@ interpretFunExpr exprFun = do
                 (interpretFunType fType)
                 fName
                 (\r arg1Ref arg2Ref -> runStmts fName funs (
-                    insertVars [(fName, r), (arg1Name, arg1Ref), (arg2Name, arg2Ref)] vars) stmts)
+                    insertVars [(fName, r), (arg1Name, arg1Ref), (arg2Name, arg2Ref)] HM.empty) stmts)
                 arg1'
                 arg2'
 
@@ -169,7 +163,6 @@ interpretFunType FStringType = "string"
 interpretFunType VoidType = "void"
 
 interpretValue :: CExpr expr => Value -> expr CVar
-interpretValue value | trace ("interpretValue: " ++ (show value)) False = undefined
 interpretValue (IntValue v) = cVarWrap (CInt v)
 interpretValue (StringValue v) = cVarWrap (CString v)
 interpretValue (DoubleValue v) = cVarWrap (CDouble v)
@@ -196,7 +189,7 @@ interpretExpr (ExprVar vname) = do
   vars <- get
   let mvar = HM.lookup vname vars
   case mvar of 
-    Nothing -> error "no such variable in scope"
+    Nothing -> errorNoVar vname
     Just a -> pure $ cReadVar a
 interpretExpr expr@ExprFun0{} = interpretFunExpr expr
 interpretExpr expr@ExprFun1{} = interpretFunExpr expr
@@ -231,7 +224,7 @@ interpretStmt fName stmt stmts = do
       rhs <- interpretExpr expr
       let maybeVar = HM.lookup vName vars
       case maybeVar of
-        Nothing -> error $ "Undefined variable `" ++ vName ++ "`"
+        Nothing -> errorNoVar vName
         Just var -> pure (var @= rhs # runStmts fName funs vars stmts)
     ReturnStmt expr -> do
         rhs <- interpretExpr expr
@@ -239,23 +232,35 @@ interpretStmt fName stmt stmts = do
         case maybeRetVar of
           Nothing -> error $ "Statement" ++ show stmt ++ "is outside the function"
           Just retVar -> pure $ retVar @= rhs
-    Fun0Stmt {} -> interpretFunStmt stmt
-    Fun1Stmt {} -> interpretFunStmt stmt
-    Fun2Stmt {} -> interpretFunStmt stmt
+    Fun0Stmt {} -> interpretFunStmt stmt >> interpretStmts fName stmts
+    Fun1Stmt {} -> interpretFunStmt stmt >> interpretStmts fName stmts
+    Fun2Stmt {} -> interpretFunStmt stmt >> interpretStmts fName stmts
 
     IfStmt expr ifStmts -> do
       expr' <- interpretExpr expr
-      pure $ cIf expr' (\_ -> runStmts fName funs vars (ifStmts ++ stmts))
+      pure $ cIf expr' 
+        (\_ -> runStmts fName funs vars ifStmts)
+        (\_ -> runStmts fName funs vars stmts)
     IfElseStmt expr thenStmts elseStmts -> do
       expr' <- interpretExpr expr
       pure $ cIfElse expr' 
-        (\_ ->  runStmts fName funs vars (thenStmts ++ stmts)) 
-        (\_ ->  runStmts fName funs vars (elseStmts ++ stmts))
+        (\_ ->  runStmts fName funs vars thenStmts) 
+        (\_ ->  runStmts fName funs vars elseStmts) 
+        (\_ ->  runStmts fName funs vars stmts)
     WhileStmt expr whileStmts -> pure $ cWhile
        (\_ -> runExpr funs vars expr) 
        (\_ -> runStmts fName funs vars whileStmts) 
        (\_ -> runStmts fName funs vars stmts) 
-
+    ReadStmt expr -> case expr of 
+       ExprVar vName -> do
+        let maybeRef = HM.lookup vName vars
+        case maybeRef of 
+          Nothing -> errorNoVar vName
+          Just ref -> pure (cRead ref # runStmts fName funs vars stmts)
+    WriteStmt expr -> do
+      expr' <- interpretExpr expr
+      pure (cWrite expr' # runStmts fName funs vars stmts)
+      
 showFName :: Grammar.Name -> String
 showFName (namespace, fName) = namespace ++ "::" ++ fName
 
@@ -273,11 +278,17 @@ traceVars vars ret =
 -- ERRORS
 --
 
+errorParse ::  a
+errorParse = error "Parse error []"
+
 errorNoArgs :: String -> a
 errorNoArgs fName = error $ "Can't run program with start function `" ++ fName ++ "`"
 
 errorNoFunction :: String -> a
 errorNoFunction fName = error $ "Function `" ++ fName ++ "` was not declared in this scope"
+
+errorNoVar :: String -> a
+errorNoVar vName = error $ "Variable `" ++ vName ++ "` was not declared in this scope"
 
 errorTooFewArguments :: String -> a
 errorTooFewArguments fName = error $ "Too few arguments to function `"  ++ fName ++ "`"
