@@ -55,6 +55,7 @@ executable harser-exe
   build-depends:
       base >=4.7 && <5
     , harser
+    , optparse-applicative
   default-language: Haskell2010
 
 test-suite harser-test
