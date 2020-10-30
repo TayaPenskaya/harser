@@ -89,16 +89,16 @@ ifElseProgram =
 int main() {
   int res = 1;
   if (1 == 2) {
-      int res = 2;
+    res = 2;
   } else {
-      if (3 > 2) {
-          res = 3;
-      }
-      if (res == 1) {
-          res = 4;
-      } else {
-          res = 5;
-      }
+    if (3 > 2) {
+      res = 3;
+    }
+    if (res == 1) {
+      res = 4;
+    } else {
+      res = 5;
+    }
   }
   return res;
 }
@@ -111,7 +111,7 @@ whileProgram =
 int main() {
   int cnt = 10;
   while (cnt > 1) {
-      cnt = cnt - 1;
+    cnt = cnt - 1;
   }
   return cnt;
 }
@@ -165,7 +165,7 @@ differentScopeProgram :: Program
 differentScopeProgram =
   [r|
 void f() {
-    int x = 2;
+  int x = 2;
 }
 
 int main() {
@@ -175,19 +175,28 @@ int main() {
 }
 |]
 
-gcdProgram :: Program
+gcdProgram :: String
 gcdProgram =
   [r|
 int gcdSlow (int a, int b) {
-	if (b == 0)
-		return a;
-	else
-		return gcd (b, a - b);
+	if (a == 0) {
+		return b;
+	}
+	while (b != 0) {
+	  if (a > b) {
+	    a = a - b;
+	  } else {
+	    b = b - a;
+	  }
+	}    
+	return a;
 }
 
 int main() {
-  int a, b;
-  cin >> a >> b;
-  cout << gcd(a, b);
+  int a = 0;
+  int b = 0;
+  std::cin >> a;
+  std::cin >> b;
+  std::cout << gcdSlow(a, b);
 }
  |]
