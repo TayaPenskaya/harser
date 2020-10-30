@@ -1,297 +1,227 @@
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE GADTs                     #-}
-{-# LANGUAGE RankNTypes                #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
-module Interpreter
-  ( interpretProgram
-  ) where
+module Interpreter (
+  interpretCDSLWithST
+)where
 
-import Grammar (Expr (..), Fun (..), FunType (..),
-                Program (..), Stmt (..), ValType (..),
-                Value (..), Name)
-import CDSL (CExpr (..), CVar (..), Type, Ref)
-
-import Control.Monad.State.Strict (StateT, get, evalStateT, modify)
-
-import Control.Monad.Reader (Reader, runReader, ask)
-
-import qualified Data.Map as HM (Map (..), lookup, insert, empty, keys, assocs)
-import Data.List (find)
-import Data.Maybe (fromMaybe, fromJust)
+import CDSL (CExpr(..), CVar(..), Name, Type, typeDefault)
+import Control.Monad.Fail (MonadFail)
+import Control.Monad.ST.Strict (ST, runST)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
 import Control.Applicative (liftA2)
-import Debug.Trace (trace)
-import Data.Map.Strict (assocs)
 
-type Funs = HM.Map String Fun
+interpretCDSLWithST :: (forall s. ST s CVar) -> CVar
+interpretCDSLWithST = runST
 
-type Vars expr = HM.Map String (Ref expr)
+type Ref' expr = expr (VarWrap' expr CVar)
 
-type FunState expr = StateT (Vars expr) (Reader Funs)
+class (Monad expr, MonadFail expr) =>  Interpret expr where
 
-interpretProgram :: CExpr expr => Program -> expr CVar
-interpretProgram program = let mainMaybe = findMain program in
-   case mainMaybe of
-    Nothing -> error "no main"
-    Just main -> runProgram program main
+  type VarWrap' expr :: * -> *
+  newRef :: CVar -> Ref' expr
+  readRef :: VarWrap expr CVar -> expr CVar
+  writeRef :: VarWrap expr CVar -> CVar -> expr ()
+  cVarWrap' :: CVar -> expr CVar
+  (@=@) :: Ref' expr -> expr CVar -> expr ()
+  (@>@) :: expr CVar -> expr CVar -> expr CVar
+  (@>=@) :: expr CVar -> expr CVar -> expr CVar
+  (@<@) :: expr CVar -> expr CVar -> expr CVar
+  (@<=@) :: expr CVar -> expr CVar -> expr CVar
+  (@==@) :: expr CVar -> expr CVar -> expr CVar
+  (@/=@) :: expr CVar -> expr CVar -> expr CVar
+  (@+@) :: expr CVar -> expr CVar -> expr CVar
+  (@-@) :: expr CVar -> expr CVar -> expr CVar
+  (@*@) :: expr CVar -> expr CVar -> expr CVar
+  (@/@) :: expr CVar -> expr CVar -> expr CVar
+  (@&&@) :: expr CVar -> expr CVar -> expr CVar
+  (@||@) :: expr CVar -> expr  CVar -> expr CVar
+  (#@) :: expr () -> expr () -> expr ()
+  not' :: expr CVar -> expr CVar
+  neg' :: expr CVar -> expr CVar
+  cWhile' :: (() -> expr CVar) -> (() -> expr ()) -> (() -> expr ()) -> expr ()
+  cIf' :: expr CVar -> (() -> expr ()) -> (() -> expr ()) -> expr ()
+  cIfElse' :: expr CVar -> (() -> expr ()) -> (() -> expr ()) -> (() -> expr ()) -> expr ()
+  cRead' :: Ref' expr -> expr ()
+  cWrite' :: expr CVar -> expr ()
+  cWithVar' :: Type -> Name -> expr CVar -> (Ref' expr -> expr ()) -> expr ()
+  cFun0' :: Type -> Name -> (Ref' expr -> expr ()) -> expr CVar
+  cFun1' :: Type -> Name -> (Ref' expr -> Ref' expr -> expr ()) -> expr CVar -> expr CVar
+  cFun2' :: Type -> Name -> (Ref' expr -> Ref' expr -> Ref' expr -> expr ()) -> expr CVar -> expr CVar  -> expr CVar
+  cReadVar' :: Ref' expr -> expr CVar
+  cCallFun' :: Name -> expr CVar -> expr CVar
 
-runProgram :: CExpr expr => Program -> Fun -> expr CVar
-runProgram program@(Program funs) main =
-  runReader
-    (evalStateT (interpretFun main) HM.empty)
-    (funsScope main funs)
+  mkRef :: String -> Ref' expr
+  mkRef vType = newRef $ typeDefault vType
+  cVarWrap' = pure
+  ref @=@ val = do
+    ref' <- ref
+    val' <- val
+    writeRef ref' val'
 
-funsScope :: Fun -> [Fun] -> Funs
-funsScope fun funs = foldr helper HM.empty $ takeWhileInc (Prelude.not . isName (funName fun)) funs
-  where
-    helper fun = HM.insert (funName fun) fun
-    
-takeWhileInc :: (a -> Bool) -> [a] -> [a]
-takeWhileInc p = foldr (\x ys -> if p x then x:ys else [x]) []
+  (@>@) = liftComp (>)
+  (@>=@) = liftComp (>=)
+  (@<@) = liftComp (<)
+  (@<=@) = liftComp (<=)
+  (@==@) = liftComp (==)
+  (@/=@) = liftComp (/=)
+  (@+@) = liftA2 (+)
+  (@-@) = liftA2 (-)
+  (@*@) = liftA2 (*)
+  (@/@) = liftA2 (/)
+  (@&&@) = liftBoolBinop (&&)
+  (@||@) = liftBoolBinop (||)
+  neg' = fmap negate
+  not' = fmap nnot
 
-findMain :: Program -> Maybe Fun
-findMain (Program funs) = find (isName "main") funs
+  cIf' pred runStmt runNext = do
+    (CBool pred') <- pred
+    if pred'
+    then runStmt () >> runNext ()
+    else runNext ()
+  cIfElse' pred runThenStmt runElseStmt runNext = do
+    (CBool pred') <- pred
+    if pred'
+    then runThenStmt () >> runNext ()
+    else runElseStmt () >> runNext ()
+  cWhile' runPred runStmt runNext = go
+   where
+      go = do
+        (CBool pred') <- runPred ()
+        if pred'
+        then runStmt () >> go
+        else runNext ()
 
-isName :: String -> Fun -> Bool
-isName fName fun = funName fun == fName
+  a #@ b = a >> b
+  cCallFun' _ expr = expr
+  cWithVar' vType name value assign = do
+    value' <- value
+    let newVarRef = newRef value'
+    newVarRef' <- newVarRef
+    assign (pure newVarRef')
 
-funName :: Fun -> String
-funName (Fun0 _ name _) = name
-funName (Fun1 _ name _ _ _) = name
-funName (Fun2 _ name _ _ _ _ _) = name
+  cFun0' fType _ func = do
+    let res = mkRef fType
+    res' <- res
+    _ <- func (pure res')
+    readRef res'
 
---
--- Grammar -> CDSL
---
+  cFun1' fType name func var = do
+    let res = mkRef fType
+    res' <- res
+    var' <- var
+    let arg = newRef var'
+    arg' <- arg
+    _ <- func (pure res') (pure arg')
+    readRef res'
 
-runStmts :: CExpr expr => String -> Funs -> Vars expr -> [Stmt] -> expr ()
-runStmts fName funs vars stmts | trace ("runStmts: " ++ (show $ HM.keys vars)) False = undefined
-runStmts fName funs vars stmts =
-  runReader
-    (evalStateT (interpretStmts fName stmts) vars)
-    funs
+  cFun2' fType name func var1 var2 = do
+    let res = mkRef fType
+    res' <- res
+    var1' <- var1
+    var2' <- var2
+    let arg1 = newRef var1'
+    arg1' <- arg1
+    let arg2 = newRef var2'
+    arg2' <- arg2
+    _ <- func (pure res') (pure arg1') (pure arg2')
+    readRef res'
 
-runExpr :: CExpr expr => Funs -> Vars expr -> Expr -> expr CVar
-runExpr funs vars expr =
-  runReader
-    (evalStateT (interpretExpr expr) vars)
-    funs
-
-insertVar :: CExpr expr => String -> Ref expr -> Vars expr -> Vars expr
-insertVar vName vRef = insertVars [(vName, vRef)]
-
-insertVars :: CExpr expr => [(String, Ref expr)] -> Vars expr -> Vars expr
-insertVars = flip $ foldr $ uncurry HM.insert
-
-interpretFun :: CExpr expr => Fun -> FunState expr (expr CVar)
-interpretFun fun = case fun of
-  Fun0 fType fName stmts -> interpretFunExpr (ExprFun0 ("", fName))
-  Fun1 _ fName _ _ _ -> errorNoArgs fName
-  Fun2 _ fName _ _ _ _ _ -> errorNoArgs fName
-
-interpretFunStmt :: CExpr expr => Stmt -> FunState expr (expr ())
-interpretFunStmt funStmt = case funStmt of
-  Fun0Stmt fName -> interpretFunExpr (ExprFun0 fName) >> pure (pure ())
-  Fun1Stmt fName arg -> interpretFunExpr (ExprFun1 fName arg) >> pure (pure ())
-  Fun2Stmt fName arg1 arg2 -> interpretFunExpr (ExprFun2 fName arg1 arg2) >> pure (pure ())
-
-interpretFunExpr :: CExpr expr => Expr -> FunState expr (expr CVar)
-interpretFunExpr exprFun = do
-  vars <- get
-  funs <- ask
-  case exprFun of
-    ExprFun0 (namespace, fName) -> do
-      let maybeFun = HM.lookup fName funs
-      case maybeFun of
-        Nothing -> errorNoFunction fName
-        Just fun ->
-          case fun of
-            Fun1 {} -> errorTooFewArguments fName
-            Fun2 {} -> errorTooFewArguments fName
-            Fun0 fType _ stmts -> pure $
-              cFun0
-                (interpretFunType fType)
-                fName
-                (\r -> runStmts fName funs (insertVar fName r HM.empty) stmts)
-
-    ExprFun1 (namespace, fName)  arg -> do
-      let maybeFun = HM.lookup fName funs
-      case maybeFun of
-        Nothing -> errorNoFunction fName
-        Just fun ->
-          case fun of
-            Fun0 {} -> errorTooManyArguments fName
-            Fun2 {} -> errorTooFewArguments fName
-            Fun1 fType _ argType argName stmts -> do
-              arg' <- interpretExpr arg
-              pure $ cFun1
-                (interpretFunType fType)
-                fName
-                (\r argRef -> runStmts fName funs (insertVars [(fName, r), (argName, argRef)] HM.empty) stmts)
-                arg'
-
-    ExprFun2 (namespace, fName)  arg1 arg2 -> do
-      let maybeFun = HM.lookup fName funs
-      case maybeFun of
-        Nothing -> errorNoFunction fName
-        Just fun ->
-          case fun of
-            Fun0 {} -> errorTooFewArguments fName
-            Fun1 {} -> errorTooFewArguments fName
-            Fun2 fType _ arg1Type arg1Name arg2Type arg2Name stmts -> do
-              arg1' <- interpretExpr arg1
-              arg2' <- interpretExpr arg2
-              pure $ cFun2
-                (interpretFunType fType)
-                fName
-                (\r arg1Ref arg2Ref -> runStmts fName funs (
-                    insertVars [(fName, r), (arg1Name, arg1Ref), (arg2Name, arg2Ref)] HM.empty) stmts)
-                arg1'
-                arg2'
-
-interpretValType :: ValType -> String
-interpretValType IntType = "int"
-interpretValType DoubleType = "double"
-interpretValType BoolType = "bool"
-interpretValType StringType = "string"
-      
-interpretFunType :: FunType -> String
-interpretFunType FIntType = "int"
-interpretFunType FDoubleType = "double"
-interpretFunType FBoolType = "bool"
-interpretFunType FStringType = "string"
-interpretFunType VoidType = "void"
-
-interpretValue :: CExpr expr => Value -> expr CVar
-interpretValue (IntValue v) = cVarWrap (CInt v)
-interpretValue (StringValue v) = cVarWrap (CString v)
-interpretValue (DoubleValue v) = cVarWrap (CDouble v)
-interpretValue (BoolValue v) = cVarWrap (CBool v)
-
-interpretExpr :: CExpr expr => Expr -> FunState expr (expr CVar)
-interpretExpr expr | trace ("interpretExpr: " ++ show expr) False = undefined
-interpretExpr (ExprPlus expr1 expr2) = liftA2 (@+) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprMinus expr1 expr2) = liftA2 (@-) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprMul expr1 expr2) = liftA2 (@*) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprDiv expr1 expr2) = liftA2 (@/) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprEq expr1 expr2) = liftA2 (@==) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprNeq expr1 expr2) = liftA2 (@/=) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprGE expr1 expr2) = liftA2 (@>=) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprLE expr1 expr2) = liftA2 (@<=) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprGT expr1 expr2) = liftA2 (@>) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprLT expr1 expr2) = liftA2 (@<) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprNeg expr) = fmap neg (interpretExpr expr)
-interpretExpr (ExprAnd expr1 expr2) = liftA2 (@&&) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprOr expr1 expr2) = liftA2 (@||) (interpretExpr expr1) (interpretExpr expr2)
-interpretExpr (ExprNot expr) = fmap CDSL.not (interpretExpr expr)
-interpretExpr (ExprBracketed expr) = interpretExpr expr
-interpretExpr (ExprVar vname) = do
-  vars <- get
-  let mvar = HM.lookup vname vars
-  case mvar of 
-    Nothing -> errorNoVar vname
-    Just a -> pure $ cReadVar a
-interpretExpr expr@ExprFun0{} = interpretFunExpr expr
-interpretExpr expr@ExprFun1{} = interpretFunExpr expr
-interpretExpr expr@ExprFun2{} = interpretFunExpr expr
-interpretExpr (ExprVal val) = pure $ interpretValue val
+  cReadVar' a = a >>= readRef
 
 
--- (a -> b -> b) -> b -> [a] -> b
-interpretStmts :: CExpr expr => String -> [Stmt] -> FunState expr (expr ())
-interpretStmts fName [] = pure (pure ())
-interpretStmts fName (x:xs) = interpretStmt fName x xs
+instance Interpret IO where
+  type VarWrap' IO = IORef
+  newRef = newIORef
+  readRef = readIORef
+  writeRef = writeIORef
+  cRead' ref = do
+    ref' <- ref
+    before <- readRef ref'
+    var <- readVar before
+    writeRef ref' var
 
-interpretStmt :: CExpr expr => String -> Stmt -> [Stmt] -> FunState expr (expr ())
-interpretStmt fName stmt stmts
-  | trace ("interpretStmt: " ++ show stmt) False = undefined
-interpretStmt fName stmt stmts = do
-  vars <- get
-  funs <- ask
-  case stmt of
-    AssignStmt vType vName expr -> do
-      rhs <- interpretExpr expr
-      let maybeVar = HM.lookup vName vars
-      case maybeVar of
-        Just _ -> error $ "Variable `" ++ vName ++ "` already exists"
-        Nothing -> pure $
-          cWithVar
-            (interpretValType vType)
-            vName
-            rhs
-            (\vRef -> runStmts fName funs (HM.insert vName vRef vars) stmts)
-    AssignStmtWithoutType vName expr -> do
-      rhs <- interpretExpr expr
-      let maybeVar = HM.lookup vName vars
-      case maybeVar of
-        Nothing -> errorNoVar vName
-        Just var -> pure (var @= rhs # runStmts fName funs vars stmts)
-    ReturnStmt expr -> do
-        rhs <- interpretExpr expr
-        let maybeRetVar = HM.lookup fName vars
-        case maybeRetVar of
-          Nothing -> error $ "Statement" ++ show stmt ++ "is outside the function"
-          Just retVar -> pure $ retVar @= rhs
-    Fun0Stmt {} -> interpretFunStmt stmt >> interpretStmts fName stmts
-    Fun1Stmt {} -> interpretFunStmt stmt >> interpretStmts fName stmts
-    Fun2Stmt {} -> interpretFunStmt stmt >> interpretStmts fName stmts
+  cWrite' buf = do
+    buf' <- buf
+    case buf' of
+      CInt i -> putStr $ show i
+      CDouble d -> putStr $ show d
+      CString s -> putStr s
+      CBool b -> putStr $ show b
 
-    IfStmt expr ifStmts -> do
-      expr' <- interpretExpr expr
-      pure $ cIf expr' 
-        (\_ -> runStmts fName funs vars ifStmts)
-        (\_ -> runStmts fName funs vars stmts)
-    IfElseStmt expr thenStmts elseStmts -> do
-      expr' <- interpretExpr expr
-      pure $ cIfElse expr' 
-        (\_ ->  runStmts fName funs vars thenStmts) 
-        (\_ ->  runStmts fName funs vars elseStmts) 
-        (\_ ->  runStmts fName funs vars stmts)
-    WhileStmt expr whileStmts -> pure $ cWhile
-       (\_ -> runExpr funs vars expr) 
-       (\_ -> runStmts fName funs vars whileStmts) 
-       (\_ -> runStmts fName funs vars stmts) 
-    ReadStmt expr -> case expr of 
-       ExprVar vName -> do
-        let maybeRef = HM.lookup vName vars
-        case maybeRef of 
-          Nothing -> errorNoVar vName
-          Just ref -> pure (cRead ref # runStmts fName funs vars stmts)
-    WriteStmt expr -> do
-      expr' <- interpretExpr expr
-      pure (cWrite expr' # runStmts fName funs vars stmts)
-      
-showFName :: Grammar.Name -> String
-showFName (namespace, fName) = namespace ++ "::" ++ fName
+instance Interpret (ST s) where
+  type VarWrap' (ST s) = STRef s
+  newRef = newSTRef
+  readRef = readSTRef
+  writeRef = writeSTRef
+  cRead' = errorIO
+  cWrite' = errorIO
 
-traceVars :: CExpr expr => Vars expr -> expr a -> expr a
-traceVars vars ret =
-  let refs = assocs vars
-   in trace "vars: " (go refs ret)
-  where
-    go :: CExpr expr => [(String, Ref expr)] -> expr a -> expr a
-    go [] ret = ret
-    go ((vName, vRef):xs) ret = do
-      value <- cReadVar vRef
-      trace ("{" ++ vName ++ ": " ++ show value ++ "}, ") (go xs ret)
---
--- ERRORS
---
+instance (Interpret expr) => CExpr expr where
 
-errorParse ::  a
-errorParse = error "Parse error []"
+  type VarWrap expr = VarWrap' expr
+  pur = pure
+  cVarWrap = cVarWrap'
+  (@=) = (@=@)
+  (@>) = (@>@)
+  (@>=) = (@>=@)
+  (@<) = (@<@)
+  (@<=) = (@<=@)
+  (@==) = (@==@)
+  (@/=) = (@/=@)
+  (@+) = (@+@)
+  (@-) = (@-@)
+  (@*) = (@*@)
+  (@/) = (@/@)
+  (@&&) = (@&&@)
+  (@||) = (@||@)
+  (#) = (#@)
+  not = not'
+  neg = neg'
+  cWhile = cWhile'
+  cIf = cIf'
+  cIfElse = cIfElse'
+  cRead = cRead'
+  cWrite = cWrite'
+  cWithVar = cWithVar'
+  cFun0 = cFun0'
+  cFun1 = cFun1'
+  cFun2 = cFun2'
+  cReadVar = cReadVar'
+  cCallFun = cCallFun'
 
-errorNoArgs :: String -> a
-errorNoArgs fName = error $ "Can't run program with start function `" ++ fName ++ "`"
+{-
+* Helpers:
+-}
 
-errorNoFunction :: String -> a
-errorNoFunction fName = error $ "Function `" ++ fName ++ "` was not declared in this scope"
+infixr 8 .:
+(.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
+(f .: g) x y = f (g x y)
 
-errorNoVar :: String -> a
-errorNoVar vName = error $ "Variable `" ++ vName ++ "` was not declared in this scope"
+liftComp :: Applicative expr => (a -> a -> Bool) -> expr a -> expr a -> expr CVar
+liftComp op = (CBool <$>) .: liftA2 op
 
-errorTooFewArguments :: String -> a
-errorTooFewArguments fName = error $ "Too few arguments to function `"  ++ fName ++ "`"
+liftBoolBinop :: (Monad expr, MonadFail expr) => (Bool -> Bool -> Bool) -> expr CVar -> expr CVar -> expr CVar
+liftBoolBinop op x y = do
+  (CBool x') <- x
+  (CBool y') <- y
+  pure $ CBool $ op x' y'
 
-errorTooManyArguments :: String -> a
-errorTooManyArguments fName = error $ "Too many arguments to function `"  ++ fName ++ "`"
+readVar :: CVar -> IO CVar
+readVar to =
+  case to of
+    CInt _    -> CInt <$> readLn
+    CDouble _ -> CDouble <$> readLn
+    CString _ -> CString <$> readLn
+    CBool _   -> CBool <$> readLn
+
+nnot :: CVar -> CVar
+nnot (CBool a) = CBool $ Prelude.not a
+nnot _         = undefined
+
+errorIO :: a
+errorIO = error "unable to perform IO actions in ST interpreter"
