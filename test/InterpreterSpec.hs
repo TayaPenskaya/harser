@@ -1,9 +1,10 @@
 module InterpreterSpec where
 
-import Interpreter (interpretProgram)
-import CDSL
-import Lexer(alexScanTokens)
-import Parser(parseCPP)
+import Translator (translateProgram)
+import Interpreter (interpretCDSLWithST)
+import Lexer (alexScanTokens)
+import Parser (parseCPP)
+import CDSL (CVar(..))
 
 import Test.Hspec
 import TestUtil
@@ -21,7 +22,7 @@ spec = describe "tests for interpreter" $ do
     testDifferentScopeProgram
 
 runProgram :: Program -> CVar
-runProgram program = interpretCDSLWithST $ interpretProgram $ parseCPP $ alexScanTokens program
+runProgram program = interpretCDSLWithST $ translateProgram $ parseCPP $ alexScanTokens program
                  
 testInterpretEmpty :: SpecWith (Arg Expectation)
 testInterpretEmpty = 

@@ -3,10 +3,11 @@ module Main where
 import Lexer(Token(..), alexScanTokens)
 import Parser(parseCPP)
 import Grammar(Program(..), FunType(..), ValType(..))
-import System.IO
+import Translator (translateProgram)
+import Interpreter (interpretCDSLWithST)
 
 main :: IO()
-main = pure ()
+-- main = pure ()
   
 -- main = do
   -- res <- test
@@ -19,9 +20,13 @@ main = pure ()
   -- print res4
   -- pure ()
 
--- main = print (parseCPP . alexScanTokens $ "int p(int a, int b) {return (a + b);}")
+-- main = print (parseCPP . alexScanTokens $ "int p(int a, int b) { std::cin >> 1+1; }")
 
 -- main = do
 --   contents <- readFile "test.txt"
 --   let parsed_contents = parseCPP . alexScanTokens $ contents
 --   print parsed_contents
+
+main = do
+  line <- getLine
+  print (interpretCDSLWithST $ translateProgram $ parseCPP $ alexScanTokens line)
