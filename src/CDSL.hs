@@ -20,7 +20,6 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
 import Data.Data (Typeable)
 import Control.Monad.Fail (MonadFail)
-import Debug.Trace (trace)
 
 type Type = String
 type Name = String
@@ -31,7 +30,14 @@ data CVar
   | CDouble Double
   | CString String
   | CBool Bool
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+  
+instance Show CVar where
+  show cVar = case cVar of 
+    CInt i -> show i
+    CDouble d -> show d
+    CString s -> s
+    CBool b -> show b
 
 instance Num CVar where
   (+) (CInt    x) (CInt    y) = CInt $ x + y
@@ -85,6 +91,8 @@ class CExpr expr where
   pur :: a -> expr a
   
   cVarWrap :: CVar -> expr CVar
+
+  cReturn :: Ref expr -> expr CVar -> expr ()
 
   infix 4 @=
   (@=) :: Ref expr -> expr CVar -> expr ()
@@ -144,16 +152,14 @@ class CExpr expr where
 
   cWithVar :: Type -> Name -> expr CVar -> (Ref expr -> expr ()) -> expr ()
 
-  cFun0 :: Type -> Name -> (Ref expr -> expr ()) -> expr CVar
+  cFun0 :: Bool -> Type -> Name -> (Ref expr -> expr ()) -> expr CVar
 
-  cFun1 :: Type -> Name -> (Ref expr -> Ref expr -> expr ()) -> expr CVar -> expr CVar
+  cFun1 :: Bool -> Type -> Name -> (Ref expr -> Ref expr -> expr ()) -> Type -> Name -> expr CVar -> expr CVar
 
-  cFun2 :: Type -> Name -> (Ref expr -> Ref expr -> Ref expr -> expr ()) -> expr CVar -> expr CVar  -> expr CVar
+  cFun2 :: Bool -> Type -> Name -> (Ref expr -> Ref expr -> Ref expr -> expr ()) -> Type -> Name -> expr CVar -> Type -> Name -> expr CVar -> expr CVar
 
   cReadVar :: Ref expr -> expr CVar
-
-  cCallFun :: Name -> expr CVar -> expr CVar
-
+  
 typeDefault :: Type -> CVar
 typeDefault t =
   case t of
