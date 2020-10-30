@@ -27,6 +27,7 @@ class (Monad expr, MonadFail expr) =>  Interpret expr where
   readRef :: VarWrap expr CVar -> expr CVar
   writeRef :: VarWrap expr CVar -> CVar -> expr ()
   cVarWrap' :: CVar -> expr CVar
+  cReturn' :: Ref' expr -> expr CVar -> expr ()
   (@=@) :: Ref' expr -> expr CVar -> expr ()
   (@>@) :: expr CVar -> expr CVar -> expr CVar
   (@>=@) :: expr CVar -> expr CVar -> expr CVar
@@ -49,11 +50,10 @@ class (Monad expr, MonadFail expr) =>  Interpret expr where
   cRead' :: Ref' expr -> expr ()
   cWrite' :: expr CVar -> expr ()
   cWithVar' :: Type -> Name -> expr CVar -> (Ref' expr -> expr ()) -> expr ()
-  cFun0' :: Type -> Name -> (Ref' expr -> expr ()) -> expr CVar
-  cFun1' :: Type -> Name -> (Ref' expr -> Ref' expr -> expr ()) -> expr CVar -> expr CVar
-  cFun2' :: Type -> Name -> (Ref' expr -> Ref' expr -> Ref' expr -> expr ()) -> expr CVar -> expr CVar  -> expr CVar
+  cFun0' :: Bool -> Type -> Name -> (Ref' expr -> expr ()) -> expr CVar
+  cFun1' :: Bool -> Type -> Name -> (Ref' expr -> Ref' expr -> expr ()) -> Type -> Name -> expr CVar -> expr CVar
+  cFun2' :: Bool -> Type -> Name -> (Ref' expr -> Ref' expr -> Ref' expr -> expr ()) -> Type -> Name -> expr CVar -> Type -> Name -> expr CVar  -> expr CVar
   cReadVar' :: Ref' expr -> expr CVar
-  cCallFun' :: Name -> expr CVar -> expr CVar
 
   mkRef :: String -> Ref' expr
   mkRef vType = newRef $ typeDefault vType
@@ -62,7 +62,7 @@ class (Monad expr, MonadFail expr) =>  Interpret expr where
     ref' <- ref
     val' <- val
     writeRef ref' val'
-
+  cReturn' = (@=@)
   (@>@) = liftComp (>)
   (@>=@) = liftComp (>=)
   (@<@) = liftComp (<)
@@ -97,20 +97,19 @@ class (Monad expr, MonadFail expr) =>  Interpret expr where
         else runNext ()
 
   a #@ b = a >> b
-  cCallFun' _ expr = expr
   cWithVar' vType name value assign = do
     value' <- value
     let newVarRef = newRef value'
     newVarRef' <- newVarRef
     assign (pure newVarRef')
 
-  cFun0' fType _ func = do
+  cFun0' _ fType _ func = do
     let res = mkRef fType
     res' <- res
     _ <- func (pure res')
     readRef res'
 
-  cFun1' fType name func var = do
+  cFun1' _ fType name func _ _ var = do
     let res = mkRef fType
     res' <- res
     var' <- var
@@ -119,7 +118,7 @@ class (Monad expr, MonadFail expr) =>  Interpret expr where
     _ <- func (pure res') (pure arg')
     readRef res'
 
-  cFun2' fType name func var1 var2 = do
+  cFun2' _ fType name func _ _ var1 _ _ var2 = do
     let res = mkRef fType
     res' <- res
     var1' <- var1
@@ -166,6 +165,7 @@ instance (Interpret expr) => CExpr expr where
   type VarWrap expr = VarWrap' expr
   pur = pure
   cVarWrap = cVarWrap'
+  cReturn = cReturn'
   (@=) = (@=@)
   (@>) = (@>@)
   (@>=) = (@>=@)
@@ -192,7 +192,6 @@ instance (Interpret expr) => CExpr expr where
   cFun1 = cFun1'
   cFun2 = cFun2'
   cReadVar = cReadVar'
-  cCallFun = cCallFun'
 
 {-
 * Helpers:
