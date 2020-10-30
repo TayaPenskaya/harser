@@ -139,11 +139,11 @@ class (Monad expr, MonadFail expr) => CExpr expr where
 
   cWhile :: (() -> expr CVar) -> (() -> expr ()) -> (() -> expr ()) -> expr ()
 
-  cIf :: expr CVar -> (() -> expr ()) -> expr ()
+  cIf :: expr CVar -> (() -> expr ()) -> (() -> expr ()) -> expr ()
 
-  cIfElse :: expr CVar -> (() -> expr ()) -> (() -> expr ()) -> expr ()
+  cIfElse :: expr CVar -> (() -> expr ()) -> (() -> expr ()) -> (() -> expr ()) -> expr ()
 
-  cRead :: Ref expr -> expr CVar
+  cRead :: Ref expr -> expr ()
 
   cWrite :: expr CVar -> expr ()
 
@@ -180,16 +180,16 @@ class (Monad expr, MonadFail expr) => CExpr expr where
   neg = fmap negate
   not = fmap nnot
   
-  cIf pred runStmt = do
+  cIf pred runStmt runNext = do
     (CBool pred') <- pred
     if pred'
-    then runStmt ()
-    else pure ()
-  cIfElse pred runThenStmt runElseStmt = do
+    then runStmt () >> runNext ()
+    else runNext ()
+  cIfElse pred runThenStmt runElseStmt runNext = do
     (CBool pred') <- pred
     if pred'
-    then runThenStmt ()
-    else runElseStmt ()
+    then runThenStmt () >> runNext ()
+    else runElseStmt () >> runNext ()
   cWhile runPred runStmt runNext = go
    where 
       go = do
@@ -200,7 +200,7 @@ class (Monad expr, MonadFail expr) => CExpr expr where
     
   a # b = a >> b
   cCallFun _ expr = expr
-  cWithVar vType name value assign = trace ("cWithVar: " ++ name) $ do
+  cWithVar vType name value assign = do
     value' <- value
     let newVarRef = newRef value'
     newVarRef' <- newVarRef
@@ -247,8 +247,19 @@ instance CExpr IO where
   newRef = newIORef
   readRef = readIORef
   writeRef = writeIORef
-  cRead ref = ref >>= readRef >>= readVar
-  cWrite buf = buf >>= print
+  cRead ref = do
+    ref' <- ref
+    before <- readRef ref'
+    var <- readVar before
+    writeRef ref' var
+
+  cWrite buf = do
+    buf' <- buf
+    case buf' of
+      CInt i -> putStr $ show i
+      CDouble d -> putStr $ show d
+      CString s -> putStr s
+      CBool b -> putStr $ show b
 
 instance CExpr (ST s) where
   type VarWrap (ST s) = STRef s
