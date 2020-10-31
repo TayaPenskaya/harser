@@ -1,25 +1,29 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 module CDSL
 ( CVar(..)
 , CExpr(..)
 , Type
 , Name
+, VarWrap
 , Ref
+, Printer (..)
 , typeDefault
 ) where
 
-import Control.Applicative (liftA2)
-import Control.Monad.Extra (ifM)
-import Control.Monad.ST.Strict (ST, runST)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
-import Data.Data (Typeable)
-import Control.Monad.Fail (MonadFail)
+import           Control.Applicative     (liftA2)
+import           Control.Monad.Extra     (ifM)
+import           Control.Monad.Fail      (MonadFail)
+import           Control.Monad.ST.Strict (ST, runST)
+import           Data.Data               (Typeable)
+import           Data.IORef              (IORef, newIORef, readIORef,
+                                          writeIORef)
+import           Data.STRef.Strict       (STRef, newSTRef, readSTRef,
+                                          writeSTRef)
 
 type Type = String
 type Name = String
@@ -31,13 +35,13 @@ data CVar
   | CString String
   | CBool Bool
   deriving (Eq, Ord)
-  
+
 instance Show CVar where
-  show cVar = case cVar of 
-    CInt i -> show i
+  show cVar = case cVar of
+    CInt i    -> show i
     CDouble d -> show d
     CString s -> s
-    CBool b -> show b
+    CBool b   -> show b
 
 instance Num CVar where
   (+) (CInt    x) (CInt    y) = CInt $ x + y
@@ -74,7 +78,7 @@ instance Fractional CVar where
   (/) (CDouble x) (CInt    y) = CDouble $ x / fromIntegral y
   (/) _ _                     = errorNonmatchingTypes
 
-{- 
+{-
 * Конструкции для работы с переменными (присваивание, чтение
 с клавиатуры, печать на стандартный вывод).
 * Конструкции условных переходов и циклов (хотя бы один из циклов for, while,
@@ -83,13 +87,20 @@ instance Fractional CVar where
 результата одно значение.
 -}
 
+type Indent = String
+newtype Printer a = Printer { toStr :: Indent -> String }
+data CVarToS a = CVarToS
+
+type family VarWrap (expr :: * -> *) :: * -> *
+type instance VarWrap (ST s) = STRef s
+type instance VarWrap IO = IORef
+type instance VarWrap Printer = CVarToS
+
 type Ref expr = expr (VarWrap expr CVar)
 
 class CExpr expr where
-  type VarWrap expr :: * -> *  -- type synonym
-  
   pur :: a -> expr a
-  
+
   cVarWrap :: CVar -> expr CVar
 
   cReturn :: Ref expr -> expr CVar -> expr ()
@@ -159,15 +170,15 @@ class CExpr expr where
   cFun2 :: Bool -> Type -> Name -> (Ref expr -> Ref expr -> Ref expr -> expr ()) -> Type -> Name -> expr CVar -> Type -> Name -> expr CVar -> expr CVar
 
   cReadVar :: Ref expr -> expr CVar
-  
+
 typeDefault :: Type -> CVar
 typeDefault t =
   case t of
-    "int" -> CInt 0
+    "int"    -> CInt 0
     "double" -> CDouble 0
     "string" -> CString ""
-    "bool" -> CBool False
-    _ -> undefined
+    "bool"   -> CBool False
+    _        -> undefined
 
 errorNonmatchingTypes :: a
 errorNonmatchingTypes = error "Unable to perform operation cause nonmatching types for operation"
