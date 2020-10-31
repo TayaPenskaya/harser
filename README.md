@@ -1,4 +1,4 @@
-# harser
+# harser -- pretty-printer|interpreter для языка C++
 
 ## Часть 1. Трансформеры монад и advanced types
 
@@ -34,7 +34,25 @@ Pascal). Также вы можете реализовать задания дл
 должен падать с человекочитаемыми ошибками. При выполнении настоятельно
 рекомендуется использовать free-monad'ы или tagless final.
 
+## Quick start
+
+### Build the project
+```
+stack build
+```
+
+### Start
+```
+stack ghci
+:main -h
+```
+
+### Run the tests
+```
+stack test
+```
+
 ## Helpful links
 
-[precedence](https://www.haskell.org/onlinereport/decls.html)
+[precedence](https://www.haskell.org/onlinereport/decls.html) \
 [final tagless](https://slides.com/fp-ctd/lecture-11#/18/0/2)
