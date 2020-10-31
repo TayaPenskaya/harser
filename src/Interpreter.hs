@@ -1,34 +1,34 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes  #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE RankNTypes           #-}
+{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Interpreter (
   interpretCDSLWithST
 )where
 
-import CDSL (CExpr(..), CVar(..), Name, Type, typeDefault)
-import Control.Monad.Fail (MonadFail)
-import Control.Monad.ST.Strict (ST, runST)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
-import Control.Applicative (liftA2)
+import           CDSL                    (CExpr (..), CVar (..), Name, Ref,
+                                          Type, VarWrap, typeDefault)
+import           Control.Applicative     (liftA2)
+import           Control.Monad.Fail      (MonadFail)
+import           Control.Monad.ST.Strict (ST, runST)
+import           Data.IORef              (IORef, newIORef, readIORef,
+                                          writeIORef)
+import           Data.STRef.Strict       (STRef, newSTRef, readSTRef,
+                                          writeSTRef)
 
 interpretCDSLWithST :: (forall s. ST s CVar) -> CVar
 interpretCDSLWithST = runST
 
-type Ref' expr = expr (VarWrap' expr CVar)
-
 class (Monad expr, MonadFail expr) =>  Interpret expr where
 
-  type VarWrap' expr :: * -> *
-  newRef :: CVar -> Ref' expr
+  newRef :: CVar -> Ref expr
   readRef :: VarWrap expr CVar -> expr CVar
   writeRef :: VarWrap expr CVar -> CVar -> expr ()
   cVarWrap' :: CVar -> expr CVar
-  cReturn' :: Ref' expr -> expr CVar -> expr ()
-  (@=@) :: Ref' expr -> expr CVar -> expr ()
+  cReturn' :: Ref expr -> expr CVar -> expr ()
+  (@=@) :: Ref expr -> expr CVar -> expr ()
   (@>@) :: expr CVar -> expr CVar -> expr CVar
   (@>=@) :: expr CVar -> expr CVar -> expr CVar
   (@<@) :: expr CVar -> expr CVar -> expr CVar
@@ -47,15 +47,15 @@ class (Monad expr, MonadFail expr) =>  Interpret expr where
   cWhile' :: (() -> expr CVar) -> (() -> expr ()) -> (() -> expr ()) -> expr ()
   cIf' :: expr CVar -> (() -> expr ()) -> (() -> expr ()) -> expr ()
   cIfElse' :: expr CVar -> (() -> expr ()) -> (() -> expr ()) -> (() -> expr ()) -> expr ()
-  cRead' :: Ref' expr -> expr ()
+  cRead' :: Ref expr -> expr ()
   cWrite' :: expr CVar -> expr ()
-  cWithVar' :: Type -> Name -> expr CVar -> (Ref' expr -> expr ()) -> expr ()
-  cFun0' :: Bool -> Type -> Name -> (Ref' expr -> expr ()) -> expr CVar
-  cFun1' :: Bool -> Type -> Name -> (Ref' expr -> Ref' expr -> expr ()) -> Type -> Name -> expr CVar -> expr CVar
-  cFun2' :: Bool -> Type -> Name -> (Ref' expr -> Ref' expr -> Ref' expr -> expr ()) -> Type -> Name -> expr CVar -> Type -> Name -> expr CVar  -> expr CVar
-  cReadVar' :: Ref' expr -> expr CVar
+  cWithVar' :: Type -> Name -> expr CVar -> (Ref expr -> expr ()) -> expr ()
+  cFun0' :: Bool -> Type -> Name -> (Ref expr -> expr ()) -> expr CVar
+  cFun1' :: Bool -> Type -> Name -> (Ref expr -> Ref expr -> expr ()) -> Type -> Name -> expr CVar -> expr CVar
+  cFun2' :: Bool -> Type -> Name -> (Ref expr -> Ref expr -> Ref expr -> expr ()) -> Type -> Name -> expr CVar -> Type -> Name -> expr CVar  -> expr CVar
+  cReadVar' :: Ref expr -> expr CVar
 
-  mkRef :: String -> Ref' expr
+  mkRef :: String -> Ref expr
   mkRef vType = newRef $ typeDefault vType
   cVarWrap' = pure
   ref @=@ val = do
@@ -100,8 +100,8 @@ class (Monad expr, MonadFail expr) =>  Interpret expr where
   cWithVar' vType name value assign = do
     value' <- value
     let newVarRef = newRef value'
-    newVarRef' <- newVarRef
-    assign (pure newVarRef')
+    newVarRef <- newVarRef
+    assign (pure newVarRef)
 
   cFun0' _ fType _ func = do
     let res = mkRef fType
@@ -134,7 +134,6 @@ class (Monad expr, MonadFail expr) =>  Interpret expr where
 
 
 instance Interpret IO where
-  type VarWrap' IO = IORef
   newRef = newIORef
   readRef = readIORef
   writeRef = writeIORef
@@ -147,13 +146,12 @@ instance Interpret IO where
   cWrite' buf = do
     buf' <- buf
     case buf' of
-      CInt i -> putStr $ show i
+      CInt i    -> putStr $ show i
       CDouble d -> putStr $ show d
       CString s -> putStr s
-      CBool b -> putStr $ show b
+      CBool b   -> putStr $ show b
 
 instance Interpret (ST s) where
-  type VarWrap' (ST s) = STRef s
   newRef = newSTRef
   readRef = readSTRef
   writeRef = writeSTRef
@@ -162,7 +160,6 @@ instance Interpret (ST s) where
 
 instance (Interpret expr) => CExpr expr where
 
-  type VarWrap expr = VarWrap' expr
   pur = pure
   cVarWrap = cVarWrap'
   cReturn = cReturn'
