@@ -1,8 +1,14 @@
-# harser -- pretty-printer|interpreter для языка C++
+# <a name="harser">HaRseR</a>
+## Pretty-printer|interpreter для языка C++
 
 ![](./example.gif)
 
-## Часть 1. Трансформеры монад и advanced types
+## Table of contents
+- [Description](#description)
+- [Quick start](#quick_start)
+- [Helpful links](#helpful)
+
+## <a name="description"> Трансформеры монад и advanced types </a> [↑](#harser)
 
 В этом задании вам предлагается реализовать интерпретатор и prerry-printer для
 подмножества вашего любимого языка программирования. В качестве любимого языка
@@ -36,7 +42,7 @@ Pascal). Также вы можете реализовать задания дл
 должен падать с человекочитаемыми ошибками. При выполнении настоятельно
 рекомендуется использовать free-monad'ы или tagless final.
 
-## Quick start
+## <a name="quick_start">Quick start</a> [↑](#harser)
 
 ### Build the project
 ```
@@ -54,7 +60,8 @@ stack ghci
 stack test
 ```
 
-## Helpful links
+## <a name="helpful">Helpful links</a> [↑](#harser)
 
-[precedence](https://www.haskell.org/onlinereport/decls.html) \
-[final tagless](https://slides.com/fp-ctd/lecture-11#/18/0/2)
+[final tagless](https://slides.com/fp-ctd/lecture-11#/18/0/2) \
+[final tagless video](https://youtu.be/Ij96nsVHbQc) \
+[precedence](https://www.haskell.org/onlinereport/decls.html)
