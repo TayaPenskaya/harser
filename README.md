@@ -1,5 +1,7 @@
 # harser -- pretty-printer|interpreter для языка C++
 
+![](./example.gif)
+
 ## Часть 1. Трансформеры монад и advanced types
 
 В этом задании вам предлагается реализовать интерпретатор и prerry-printer для
