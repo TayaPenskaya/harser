@@ -8,18 +8,20 @@ module Translator
   , translateFunctions
   ) where
 
-import Grammar (Expr (..), Fun (..), FunType (..),
-                Program (..), Stmt (..), ValType (..),
-                Value (..), Name)
-import CDSL (CExpr (..), CVar (..), Type, Ref, typeDefault)
+import           CDSL                       (CExpr (..), CVar (..), Ref, Type,
+                                             typeDefault)
+import           Grammar                    (Expr (..), Fun (..), FunType (..),
+                                             Name, Program (..), Stmt (..),
+                                             ValType (..), Value (..))
 
-import Control.Monad.State.Strict (StateT, get, evalStateT, modify)
+import           Control.Monad.State.Strict (StateT, evalStateT, get, modify)
 
-import Control.Monad.Reader (Reader, runReader, ask)
+import           Control.Monad.Reader       (Reader, ask, runReader)
 
-import qualified Data.Map.Strict as HM (Map (..), lookup, insert, empty, keys, assocs)
-import Data.List (find)
-import Control.Applicative (liftA2)
+import           Control.Applicative        (liftA2)
+import           Data.List                  (find)
+import qualified Data.Map.Strict            as HM (Map (..), assocs, empty,
+                                                   insert, keys, lookup)
 
 type Funs = HM.Map String Fun
 
@@ -33,7 +35,7 @@ translateFunctions program@(Program funs) = map (runProgram program) funs
 translateProgram :: CExpr expr => Program -> expr CVar
 translateProgram program = let mainMaybe = findMain program in
    case mainMaybe of
-    Nothing -> error "no main"
+    Nothing   -> error "no main"
     Just main -> runProgram program main
 
 runProgram :: CExpr expr => Program -> Fun -> expr CVar
@@ -46,7 +48,7 @@ funsScope :: Fun -> [Fun] -> Funs
 funsScope fun funs = foldr helper HM.empty $ takeWhileInc (Prelude.not . isName (funName fun)) funs
   where
     helper fun = HM.insert (funName fun) fun
-    
+
 takeWhileInc :: (a -> Bool) -> [a] -> [a]
 takeWhileInc p = foldr (\x ys -> if p x then x:ys else [x]) []
 
@@ -57,8 +59,8 @@ isName :: String -> Fun -> Bool
 isName fName fun = funName fun == fName
 
 funName :: Fun -> String
-funName (Fun0 _ name _) = name
-funName (Fun1 _ name _ _ _) = name
+funName (Fun0 _ name _)         = name
+funName (Fun1 _ name _ _ _)     = name
 funName (Fun2 _ name _ _ _ _ _) = name
 
 --
@@ -85,10 +87,10 @@ insertVars = flip $ foldr $ uncurry HM.insert
 
 vTypeDefault :: ValType -> Expr
 vTypeDefault vType = case vType of
-  IntType -> ExprVal $ IntValue 0
+  IntType    -> ExprVal $ IntValue 0
   StringType -> ExprVal $ StringValue ""
   DoubleType -> ExprVal $ DoubleValue 0
-  BoolType -> ExprVal $ BoolValue False
+  BoolType   -> ExprVal $ BoolValue False
 
 interpretFun :: CExpr expr => Fun -> FunState expr (expr CVar)
 interpretFun fun = case fun of
@@ -167,23 +169,23 @@ interpretFunExpr isCall exprFun = do
                 arg2'
 
 interpretValType :: ValType -> String
-interpretValType IntType = "int"
+interpretValType IntType    = "int"
 interpretValType DoubleType = "double"
-interpretValType BoolType = "bool"
+interpretValType BoolType   = "bool"
 interpretValType StringType = "string"
-      
+
 interpretFunType :: FunType -> String
-interpretFunType FIntType = "int"
+interpretFunType FIntType    = "int"
 interpretFunType FDoubleType = "double"
-interpretFunType FBoolType = "bool"
+interpretFunType FBoolType   = "bool"
 interpretFunType FStringType = "string"
-interpretFunType VoidType = "void"
+interpretFunType VoidType    = "void"
 
 interpretValue :: CExpr expr => Value -> expr CVar
-interpretValue (IntValue v) = cVarWrap (CInt v)
+interpretValue (IntValue v)    = cVarWrap (CInt v)
 interpretValue (StringValue v) = cVarWrap (CString v)
 interpretValue (DoubleValue v) = cVarWrap (CDouble v)
-interpretValue (BoolValue v) = cVarWrap (CBool v)
+interpretValue (BoolValue v)   = cVarWrap (CBool v)
 
 interpretExpr :: CExpr expr => Expr -> FunState expr (expr CVar)
 interpretExpr (ExprPlus expr1 expr2) = liftA2 (@+) (interpretExpr expr1) (interpretExpr expr2)
@@ -204,9 +206,9 @@ interpretExpr (ExprBracketed expr) = interpretExpr expr
 interpretExpr (ExprVar vname) = do
   vars <- get
   let mvar = HM.lookup vname vars
-  case mvar of 
+  case mvar of
     Nothing -> errorNoVar vname
-    Just a -> pure $ cReadVar a
+    Just a  -> pure $ cReadVar a
 interpretExpr expr@ExprFun0{} = interpretFunExpr True expr
 interpretExpr expr@ExprFun1{} = interpretFunExpr True expr
 interpretExpr expr@ExprFun2{} = interpretFunExpr True expr
@@ -215,7 +217,7 @@ interpretExpr (ExprVal val) = pure $ interpretValue val
 
 -- (a -> b -> b) -> b -> [a] -> b
 interpretStmts :: CExpr expr => String -> [Stmt] -> FunState expr (expr ())
-interpretStmts fName [] = pure (pur ())
+interpretStmts fName []     = pure (pur ())
 interpretStmts fName (x:xs) = interpretStmt fName x xs
 
 interpretStmt :: CExpr expr => String -> Stmt -> [Stmt] -> FunState expr (expr ())
@@ -238,7 +240,7 @@ interpretStmt fName stmt stmts = do
       rhs <- interpretExpr expr
       let maybeVar = HM.lookup vName vars
       case maybeVar of
-        Nothing -> errorNoVar vName
+        Nothing  -> errorNoVar vName
         Just var -> pure (var @= rhs # runStmts fName funs vars stmts)
     ReturnStmt expr -> do
         rhs <- interpretExpr expr
@@ -252,29 +254,29 @@ interpretStmt fName stmt stmts = do
 
     IfStmt expr ifStmts -> do
       expr' <- interpretExpr expr
-      pure $ cIf expr' 
+      pure $ cIf expr'
         (\_ -> runStmts fName funs vars ifStmts)
         (\_ -> runStmts fName funs vars stmts)
     IfElseStmt expr thenStmts elseStmts -> do
       expr' <- interpretExpr expr
-      pure $ cIfElse expr' 
-        (\_ ->  runStmts fName funs vars thenStmts) 
-        (\_ ->  runStmts fName funs vars elseStmts) 
+      pure $ cIfElse expr'
+        (\_ ->  runStmts fName funs vars thenStmts)
+        (\_ ->  runStmts fName funs vars elseStmts)
         (\_ ->  runStmts fName funs vars stmts)
     WhileStmt expr whileStmts -> pure $ cWhile
-       (\_ -> runExpr funs vars expr) 
-       (\_ -> runStmts fName funs vars whileStmts) 
-       (\_ -> runStmts fName funs vars stmts) 
-    ReadStmt expr -> case expr of 
+       (\_ -> runExpr funs vars expr)
+       (\_ -> runStmts fName funs vars whileStmts)
+       (\_ -> runStmts fName funs vars stmts)
+    ReadStmt expr -> case expr of
        ExprVar vName -> do
         let maybeRef = HM.lookup vName vars
-        case maybeRef of 
-          Nothing -> errorNoVar vName
+        case maybeRef of
+          Nothing  -> errorNoVar vName
           Just ref -> pure (cRead ref # runStmts fName funs vars stmts)
     WriteStmt expr -> do
       expr' <- interpretExpr expr
       pure (cWrite expr' # runStmts fName funs vars stmts)
-      
+
 showFName :: Grammar.Name -> String
 showFName (namespace, fName) = namespace ++ "::" ++ fName
 
