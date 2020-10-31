@@ -46,10 +46,10 @@ run (IF file) = do
   ctx <- readFile file
   res <- runInterpret ctx
   print res
-run (PrintS str) = print str
+run (PrintS str) = putStrLn str
 run (PrintF file) = do
   ctx <- readFile file
-  print ctx
+  putStrLn ctx
 
 opts :: ParserInfo Command
 opts = info (parser <**> helper)
