@@ -1,15 +1,15 @@
 module InterpreterSpec where
 
-import Translator (translateProgram)
-import Interpreter (interpretCDSLWithST)
-import Lexer (alexScanTokens)
-import Parser (parseCPP)
-import CDSL (CVar(..))
+import           CDSL        (CVar (..))
+import           Interpreter (interpretCDSLWithST)
+import           Lexer       (alexScanTokens)
+import           Parser      (parseCPP)
+import           Translator  (translateProgram)
 
-import Test.Hspec
-import TestUtil
+import           Test.Hspec
+import           TestUtil
 
-spec :: Spec 
+spec :: Spec
 spec = describe "tests for interpreter" $ do
     testInterpretEmpty
     testInterpretOneVar
@@ -23,9 +23,9 @@ spec = describe "tests for interpreter" $ do
 
 runProgram :: Program -> CVar
 runProgram program = interpretCDSLWithST $ translateProgram $ parseCPP $ alexScanTokens program
-                 
+
 testInterpretEmpty :: SpecWith (Arg Expectation)
-testInterpretEmpty = 
+testInterpretEmpty =
   uTest
     "interpreting empty program"
     (runProgram emptyProgram)
@@ -33,58 +33,58 @@ testInterpretEmpty =
 
 
 testInterpretOneVar :: SpecWith (Arg Expectation)
-testInterpretOneVar = 
+testInterpretOneVar =
   uTest
     "interpreting one var program"
     (runProgram oneVarProgram)
     (CInt 0)
 
 testInterpretTwoVar :: SpecWith (Arg Expectation)
-testInterpretTwoVar = 
+testInterpretTwoVar =
   uTest
     "interpreting two vars program"
     (runProgram twoVarProgram)
     (CInt 1)
 
 testInterpretArithmetic :: SpecWith (Arg Expectation)
-testInterpretArithmetic = 
+testInterpretArithmetic =
   uTest
     "interpreting arithmetic program"
     (runProgram arithmeticExprProgram)
     (CInt 912)
-    
+
 testInterpretIfElse :: SpecWith (Arg Expectation)
-testInterpretIfElse = 
+testInterpretIfElse =
   uTest
     "interpreting if else program"
     (runProgram ifElseProgram)
     (CInt 5)
 
 testWhileProgram :: SpecWith (Arg Expectation)
-testWhileProgram = 
+testWhileProgram =
   uTest
     "interpreting while program"
     (runProgram whileProgram)
-    (CInt 1) 
-    
+    (CInt 1)
+
 testInterpretTwoFuncProgram :: SpecWith (Arg Expectation)
-testInterpretTwoFuncProgram = 
+testInterpretTwoFuncProgram =
   uTest
     "interpreting two func program"
     (runProgram twoFuncProgram)
     (CInt 16)
-    
+
 testInterpretPassByValueProgram :: SpecWith (Arg Expectation)
-testInterpretPassByValueProgram = 
+testInterpretPassByValueProgram =
   uTest
     "interpreting pass by value program"
     (runProgram passByValueProgram)
     (CInt 21)
-    
+
 testDifferentScopeProgram :: SpecWith (Arg Expectation)
-testDifferentScopeProgram = 
+testDifferentScopeProgram =
   uTest
     "interpreting different scope program"
     (runProgram differentScopeProgram)
-    (CInt 1)                   
-        
+    (CInt 1)
+

@@ -1,19 +1,12 @@
 module ParserSpec where
 
-import Test.Hspec
-import TestUtil
+import           Test.Hspec
+import           TestUtil
 
-import Lexer(Token(..), alexScanTokens)
-import Parser(parseCPP)
-import Grammar
-    ( Value(..)
-    , ValType(..)
-    , FunType(..)
-    , Expr(..)
-    , Stmt(..)
-    , Fun(..)
-    , Program(..)
-    )
+import           Grammar    (Expr (..), Fun (..), FunType (..), Program (..),
+                             Stmt (..), ValType (..), Value (..))
+import           Lexer      (Token (..), alexScanTokens)
+import           Parser     (parseCPP)
 
 spec :: Spec
 spec = describe "tests for parser" $ do
@@ -48,7 +41,7 @@ testParseFoo2WithStdFoo =
    uTest
     "parsing function2 with foo with namespace"
     (parseCPP . alexScanTokens $ "int a(int b, string c) { return std::d(); }") $
-    Program [Fun2 FIntType "a" IntType "b" StringType "c" [ReturnStmt (ExprFun0 ("std","d"))]]  
+    Program [Fun2 FIntType "a" IntType "b" StringType "c" [ReturnStmt (ExprFun0 ("std","d"))]]
 
 testParseFooWithStmts :: SpecWith (Arg Expectation)
 testParseFooWithStmts =
