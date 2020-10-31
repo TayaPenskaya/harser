@@ -1,16 +1,17 @@
 module Main where
 
-import Lexer (Token(..), alexScanTokens)
-import Parser (parseCPP)
-import Grammar (Program(..))
-import Translator (translateProgram)
-import Interpreter (interpretCDSLWithST)
-import CDSL (CVar(..))
+import           CDSL                   (CVar (..))
+import           Grammar                (Program (..))
+import           Interpreter            (interpretCDSLWithST)
+import           Lexer                  (Token (..), alexScanTokens)
+import           Parser                 (parseCPP)
+import           Printer                (printProgram)
+import           Translator             (translateProgram)
 
-import Options.Applicative
-import Data.Semigroup ((<>))
-import GHC.Base (returnIO)
-import Control.Monad.IO.Class (liftIO)
+import           Control.Monad.IO.Class (liftIO)
+import           Data.Semigroup         ((<>))
+import           GHC.Base               (returnIO)
+import           Options.Applicative
 
 data Command = IF String | IS String | PrintS String | PrintF String
 
@@ -53,10 +54,10 @@ run (PrintF file) = do
 opts :: ParserInfo Command
 opts = info (parser <**> helper)
             ( fullDesc
-            <> progDesc "Enter command..." 
+            <> progDesc "Enter command..."
             <> header "Program for pretty-printing and interpreting CPP code." )
 
 main :: IO()
 main = do
-  args <- execParser opts 
+  args <- execParser opts
   run args
