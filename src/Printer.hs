@@ -10,16 +10,13 @@ module Printer
 
 import           CDSL
 import           Data.IORef
+import           Data.List     (intercalate)
 import           Data.Typeable
 import           Debug.Trace   (trace)
-import Data.List (intercalate)
-import Translator (translateFunctions)
-import Parser (parseCPP)
-import Lexer (alexScanTokens)
+import           Lexer         (alexScanTokens)
+import           Parser        (parseCPP)
+import           Translator    (translateFunctions)
 
-type Indent = String
-
-newtype Printer a = Printer { toStr :: Indent -> String }
 
 printProgram :: String -> String
 printProgram program = intercalate "\n" $ map (`toStr` "") (translateFunctions $ parseCPP $ alexScanTokens program)
@@ -27,7 +24,6 @@ printProgram program = intercalate "\n" $ map (`toStr` "") (translateFunctions $
 data CVarToS a = CVarToS
 
 instance CExpr Printer where
-  type (VarWrap Printer) = CVarToS
   pur a = Printer $ const ""
   cVarWrap a = Printer $ \_ -> show a
 
@@ -45,7 +41,7 @@ instance CExpr Printer where
   (#) a b = Printer $ \pr -> toStr a pr <> ";\n" <> toStr b pr
   (@=) a b = Printer $ \pr -> pr <> toStr a pr  <> " = " <> toStr b pr
   cReturn a b = Printer $ \pr -> pr <> "return " <> toStr b pr <> ";\n"
-  
+
   (@&&) = showBinOp "&&"
   (@||) = showBinOp "||"
   neg a = Printer $ \pr -> "-" <> toStr a pr
