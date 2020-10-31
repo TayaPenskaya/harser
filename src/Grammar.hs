@@ -16,19 +16,19 @@ data Value
   | IntValue Int
   | DoubleValue Double
   | BoolValue Bool
-  deriving (Eq, Show) 
+  deriving (Eq, Show)
 
 data ValType
-  = IntType 
-  | DoubleType 
-  | BoolType 
+  = IntType
+  | DoubleType
+  | BoolType
   | StringType
   deriving (Eq, Show)
 
-data FunType 
-  = FIntType 
-  | FDoubleType 
-  | FBoolType 
+data FunType
+  = FIntType
+  | FDoubleType
+  | FBoolType
   | FStringType
   | VoidType
   deriving (Eq, Show)
@@ -58,11 +58,11 @@ data Expr
   | ExprVal Value
   deriving (Eq, Show)
 
-data Stmt 
+data Stmt
   = AssignStmt ValType String Expr
   | AssignStmtWithoutType String Expr
   | ReturnStmt Expr
-  | Fun0Stmt Name 
+  | Fun0Stmt Name
   | Fun1Stmt Name Expr
   | Fun2Stmt Name Expr Expr
   | ReadStmt Expr
