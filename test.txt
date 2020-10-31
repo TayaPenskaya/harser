@@ -1,0 +1,8 @@
+int main() {
+  int c = 1;
+  int b = 4;
+  int d = b+c;
+  string h = "Hello";
+  std::cout << d;
+  std::cout << h;
+}
