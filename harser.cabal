@@ -33,6 +33,7 @@ library
     , CDSL
     , Interpreter
     , Translator
+    , Printer
   other-modules:
       Paths_harser
   hs-source-dirs:
